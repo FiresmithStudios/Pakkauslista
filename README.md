@@ -1,32 +1,28 @@
 # Warehouse Packing Tracker
 
-Lightweight warehouse packing progress tracker for multi-device local network use. Tracks positions in containers (merikontit) with real-time updates on packed quantities and operator logging.
+Lightweight warehouse packing progress tracker. Tracks positions in containers (merikontit) with packed quantities and operator logging. Data stored in the cloud (Vercel Blob).
 
 ## Quick Start
 
 ### Development
 
 ```bash
-# Install dependencies
 npm install
-cd client && npm install && cd ..
-
-# Run backend and frontend concurrently
 npm run dev
 ```
 
-- Backend: http://localhost:3001
-- Frontend: http://localhost:5173 (proxies API to backend)
+- Frontend: http://localhost:5173
+- Local dev uses localStorage (no API). Deploy to Vercel for cloud storage.
 
-### Production
+### Production (Vercel)
 
-```bash
-npm install
-cd client && npm install && cd ..
-npm run start
-```
+1. Push to GitHub and connect the repo to Vercel.
 
-Serves the app at http://localhost:3001. Access from other devices on your LAN using the server's IP address.
+2. In Vercel project → Storage → Create Database → **Blob** (free tier).
+
+3. Deploy. Vercel auto-adds `BLOB_READ_WRITE_TOKEN`.
+
+Data is stored in a single JSON file in Vercel Blob. All devices share the same data.
 
 ## Features
 
@@ -37,34 +33,10 @@ Serves the app at http://localhost:3001. Access from other devices on your LAN u
 - **Last operator overlay** – Shows who last modified and when
 - **Operator identification** – Stored in device localStorage (no auth)
 - **Mobile-friendly** – Large tappable buttons, touch-optimized
+- **Cloud storage** – JSON file in Vercel Blob, shared across devices
 
 ## Tech Stack
 
 - **Frontend:** React + Vite + TypeScript
-- **Backend:** Node.js + Express (local) / Vercel Serverless (deployed)
-- **Database:** SQLite (local) / Turso (Vercel)
-
-## Deploy to Vercel
-
-1. Create a [Turso](https://turso.tech) database:
-   ```bash
-   npx turso db create pakkauslista
-   npx turso db show pakkauslista --url
-   npx turso db tokens create pakkauslista
-   ```
-
-2. In your Vercel project settings, add environment variables:
-   - `TURSO_DATABASE_URL` – from `turso db show --url`
-   - `TURSO_AUTH_TOKEN` – from `turso db tokens create`
-
-3. Deploy:
-   ```bash
-   vercel
-   ```
-
-The app will use Turso on Vercel and SQLite when running locally.
-
-## Data
-
-- **Local:** Database is created automatically in `data/warehouse.db`
-- **Vercel:** Turso database, tables created on first API call
+- **Storage:** Vercel Blob (single JSON file)
+- **Deploy:** Vercel (static + serverless API)
