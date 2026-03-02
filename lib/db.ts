@@ -1,13 +1,6 @@
-// Use default client: supports file: on Node.js (Vercel) and remote URLs (Turso)
-import { createClient } from '@libsql/client';
-
-const url = process.env.TURSO_DATABASE_URL || 'file:/tmp/warehouse.db';
+// Turso (libsql) when env is set; better-sqlite3 fallback otherwise (avoids ESM issues on Vercel)
+const url = process.env.TURSO_DATABASE_URL;
 const authToken = process.env.TURSO_AUTH_TOKEN;
-
-export const db = createClient({
-  url,
-  authToken: authToken || undefined,
-});
 
 const INIT_STATEMENTS = [
   `CREATE TABLE IF NOT EXISTS containers (
@@ -42,8 +35,50 @@ const INIT_STATEMENTS = [
   `CREATE INDEX IF NOT EXISTS idx_transactions_position ON position_transactions(positionId)`,
 ];
 
-export async function initDb() {
-  for (const stmt of INIT_STATEMENTS) {
-    await db.execute(stmt);
+export type DbClient = {
+  execute: (opts: { sql: string; args?: unknown[] } | string) => Promise<{ rows: unknown[] }>;
+};
+
+let cached: Promise<{ db: DbClient; initDb: () => Promise<void> }> | null = null;
+
+export async function getDb(): Promise<{ db: DbClient; initDb: () => Promise<void> }> {
+  if (!cached) {
+    cached = (async () => {
+      if (url) {
+        const { createClient } = await import('@libsql/client/web');
+        const client = createClient({ url, authToken: authToken || undefined });
+        const db: DbClient = {
+          execute: (opts) => {
+            const o = typeof opts === 'string' ? { sql: opts } : opts;
+            return client.execute(o) as Promise<{ rows: unknown[] }>;
+          },
+        };
+        const initDb = async () => {
+          for (const s of INIT_STATEMENTS) await db.execute(s);
+        };
+        return { db, initDb };
+      } else {
+        const Database = require('better-sqlite3');
+        const sqlite = new Database('/tmp/warehouse.db');
+        const db: DbClient = {
+          execute: (opts) => {
+            const o = typeof opts === 'string' ? { sql: opts } : opts;
+            const { sql, args = [] } = o;
+            const stmt = sqlite.prepare(sql);
+            const upper = sql.trim().toUpperCase();
+            if (upper.startsWith('SELECT')) {
+              return Promise.resolve({ rows: stmt.all(...(args as [])) });
+            }
+            stmt.run(...(args as []));
+            return Promise.resolve({ rows: [] });
+          },
+        };
+        const initDb = async () => {
+          for (const s of INIT_STATEMENTS) sqlite.exec(s);
+        };
+        return { db, initDb };
+      }
+    })();
   }
+  return cached;
 }

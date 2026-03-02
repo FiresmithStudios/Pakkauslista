@@ -1,5 +1,5 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { db, initDb } from '../../../lib/db';
+import { getDb } from '../../../lib/db';
 import { v4 as uuidv4 } from 'uuid';
 
 function normalizePosition(row: Record<string, unknown>) {
@@ -37,6 +37,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return res.status(400).json({ error: 'delta must be a non-zero number' });
   }
 
+  const { db, initDb } = await getDb();
   try {
     await initDb();
   } catch {

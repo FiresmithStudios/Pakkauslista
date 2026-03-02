@@ -1,5 +1,5 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { db, initDb } from '../../../lib/db';
+import { getDb } from '../../../lib/db';
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   res.setHeader('Access-Control-Allow-Origin', '*');
@@ -11,6 +11,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   const id = req.query.id as string;
   if (!id) return res.status(400).json({ error: 'id is required' });
 
+  const { db, initDb } = await getDb();
   try {
     await initDb();
   } catch {

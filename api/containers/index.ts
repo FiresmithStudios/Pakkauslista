@@ -1,5 +1,5 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { db, initDb } from '../../lib/db';
+import { getDb } from '../../lib/db';
 import { v4 as uuidv4 } from 'uuid';
 
 function normalizeContainer(row: Record<string, unknown>) {
@@ -18,6 +18,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
   if (req.method === 'OPTIONS') return res.status(204).end();
 
+  const { db, initDb } = await getDb();
   try {
     await initDb();
   } catch {

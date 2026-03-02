@@ -1,5 +1,5 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { db, initDb } from '../../../lib/db';
+import { getDb } from '../../../lib/db';
 
 function normalizeContainer(row: Record<string, unknown>) {
   return {
@@ -20,6 +20,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   const number = req.query.number as string;
   if (!number) return res.status(400).json({ error: 'number is required' });
 
+  const { db, initDb } = await getDb();
   try {
     await initDb();
   } catch {
