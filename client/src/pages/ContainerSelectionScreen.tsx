@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useOperator } from '../OperatorContext';
-import { containersApi } from '../api';
+import { containersApi, exportData } from '../api';
 import type { Container } from '../types';
 import ConfirmModal from '../components/ConfirmModal';
 
@@ -127,14 +127,22 @@ export default function ContainerSelectionScreen() {
             <h1 style={styles.title}>Kontit</h1>
             <p style={styles.operator}>Operaattori: {operatorName}</p>
           </div>
-          <a
-            href="/api/export"
-            download
+          <button
+            type="button"
+            onClick={() => {
+              const blob = new Blob([exportData()], { type: 'application/json' });
+              const url = URL.createObjectURL(blob);
+              const a = document.createElement('a');
+              a.href = url;
+              a.download = `warehouse-backup-${new Date().toISOString().slice(0, 10)}.json`;
+              a.click();
+              URL.revokeObjectURL(url);
+            }}
             style={styles.exportBtn}
             title="Lataa tietokanta JSON-tiedostona"
           >
             Lataa varmuuskopio
-          </a>
+          </button>
         </div>
       </header>
 
@@ -263,8 +271,8 @@ const styles: Record<string, React.CSSProperties> = {
     color: 'var(--color-accent)',
     borderRadius: 'var(--radius-sm)',
     border: '2px solid var(--color-surface-hover)',
-    textDecoration: 'none',
     whiteSpace: 'nowrap',
+    cursor: 'pointer',
   },
   title: {
     margin: 0,
