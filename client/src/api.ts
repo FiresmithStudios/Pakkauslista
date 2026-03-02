@@ -1,17 +1,27 @@
 import type { Container, Position, PositionTransaction } from './types';
 
-const API = '/api';
+const API = (import.meta.env.VITE_API_URL || '/api').replace(/\/$/, '');
 
 async function fetchApi<T>(url: string, options?: RequestInit): Promise<T> {
-  const res = await fetch(`${API}${url}`, {
+  const path = url.startsWith('/') ? url : `/${url}`;
+  const res = await fetch(`${API}${path}`, {
     ...options,
     headers: { 'Content-Type': 'application/json', ...options?.headers },
   });
+
+  const contentType = res.headers.get('content-type') ?? '';
+  const isJson = contentType.includes('application/json');
+
   if (!res.ok) {
-    const err = await res.json().catch(() => ({ error: res.statusText }));
+    const err = isJson
+      ? await res.json().catch(() => ({ error: res.statusText }))
+      : { error: res.statusText || `Request failed (${res.status})` };
     throw new Error(err.error || res.statusText);
   }
   if (res.status === 204) return undefined as T;
+  if (!isJson) {
+    throw new Error('Server returned non-JSON response. Is the API running?');
+  }
   return res.json();
 }
 

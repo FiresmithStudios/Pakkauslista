@@ -5,10 +5,14 @@ import { registerSW } from 'virtual:pwa-register'
 import App from './App'
 import './index.css'
 
-registerSW({
-  onNeedRefresh() {},
-  onOfflineReady() {},
-})
+try {
+  registerSW({
+    onNeedRefresh() {},
+    onOfflineReady() {},
+  })
+} catch {
+  // PWA registration failed - app works without it
+}
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
