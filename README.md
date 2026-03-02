@@ -41,9 +41,30 @@ Serves the app at http://localhost:3001. Access from other devices on your LAN u
 ## Tech Stack
 
 - **Frontend:** React + Vite + TypeScript
-- **Backend:** Node.js + Express
-- **Database:** SQLite (stored in `data/warehouse.db`)
+- **Backend:** Node.js + Express (local) / Vercel Serverless (deployed)
+- **Database:** SQLite (local) / Turso (Vercel)
+
+## Deploy to Vercel
+
+1. Create a [Turso](https://turso.tech) database:
+   ```bash
+   npx turso db create pakkauslista
+   npx turso db show pakkauslista --url
+   npx turso db tokens create pakkauslista
+   ```
+
+2. In your Vercel project settings, add environment variables:
+   - `TURSO_DATABASE_URL` – from `turso db show --url`
+   - `TURSO_AUTH_TOKEN` – from `turso db tokens create`
+
+3. Deploy:
+   ```bash
+   vercel
+   ```
+
+The app will use Turso on Vercel and SQLite when running locally.
 
 ## Data
 
-Database is created automatically on first run. Backup the `data/` folder for regular backups.
+- **Local:** Database is created automatically in `data/warehouse.db`
+- **Vercel:** Turso database, tables created on first API call
