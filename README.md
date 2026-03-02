@@ -1,6 +1,6 @@
 # Warehouse Packing Tracker
 
-Lightweight warehouse packing progress tracker. Tracks positions in containers (merikontit) with packed quantities and operator logging. Data stored in the cloud (Vercel Blob).
+Lightweight warehouse packing progress tracker. Tracks positions in containers (merikontit) with packed quantities and operator logging. Data stored in Supabase Storage (cloud).
 
 ## Quick Start
 
@@ -12,17 +12,24 @@ npm run dev
 ```
 
 - Frontend: http://localhost:5173
-- Local dev uses localStorage (no API). Deploy to Vercel for cloud storage.
+- Local dev uses localStorage when Supabase is not configured.
 
-### Production (Vercel)
+### Production (Vercel + Supabase)
 
-1. Push to GitHub and connect the repo to Vercel.
+1. **Create Supabase project** (free): https://supabase.com
+   - New project → note the **Project URL** and **anon public** key (Settings → API).
 
-2. In Vercel project → Storage → Create Database → **Blob** (free tier).
+2. **Create storage bucket:**
+   - Storage → New bucket → name: `warehouse`
+   - Make it **public** (or add policy: allow anon for insert/update/select).
 
-3. Deploy. Vercel auto-adds `BLOB_READ_WRITE_TOKEN`.
+3. **Add env vars in Vercel** (Settings → Environment Variables):
+   - `VITE_SUPABASE_URL` – your Project URL
+   - `VITE_SUPABASE_ANON_KEY` – your anon public key
 
-Data is stored in a single JSON file in Vercel Blob. All devices share the same data.
+4. Push to GitHub. Vercel builds and deploys.
+
+Data is stored in a single JSON file in Supabase Storage. All devices share the same data. No serverless API = no ESM issues.
 
 ## Features
 
@@ -33,10 +40,10 @@ Data is stored in a single JSON file in Vercel Blob. All devices share the same 
 - **Last operator overlay** – Shows who last modified and when
 - **Operator identification** – Stored in device localStorage (no auth)
 - **Mobile-friendly** – Large tappable buttons, touch-optimized
-- **Cloud storage** – JSON file in Vercel Blob, shared across devices
+- **Cloud storage** – JSON file in Supabase Storage, shared across devices
 
 ## Tech Stack
 
 - **Frontend:** React + Vite + TypeScript
-- **Storage:** Vercel Blob (single JSON file)
-- **Deploy:** Vercel (static + serverless API)
+- **Storage:** Supabase Storage (single JSON file, client-only)
+- **Deploy:** Vercel (static only)

@@ -3,15 +3,10 @@
   "version": "1.0.0",
   "description": "Lightweight warehouse packing progress tracker",
   "private": true,
-  "type": "module",
   "scripts": {
     "dev": "cd client && npm run dev",
     "build": "cd client && npm install && npm run build",
     "preview": "cd client && npm run preview"
-  },
-  "dependencies": {
-    "@vercel/blob": "^0.25.0",
-    "@vercel/node": "^3.2.0"
   },
   "devDependencies": {
     "typescript": "~5.6.2"

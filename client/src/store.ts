@@ -1,8 +1,16 @@
+import { createClient, SupabaseClient } from '@supabase/supabase-js';
 import type { Container, Position, PositionTransaction } from './types';
 
 const STORAGE_KEY = 'warehouse-packing-data';
-// Empty = same origin (works when deployed). For local dev, API fails → localStorage fallback
-const API_BASE = (import.meta.env.VITE_API_URL ?? '').replace(/\/$/, '');
+const FILE_PATH = 'data.json';
+
+const supabaseUrl = import.meta.env.VITE_SUPABASE_URL ?? '';
+const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY ?? '';
+
+let supabase: SupabaseClient | null = null;
+if (supabaseUrl && supabaseAnonKey) {
+  supabase = createClient(supabaseUrl, supabaseAnonKey);
+}
 
 interface Store {
   containers: Container[];
@@ -11,14 +19,16 @@ interface Store {
 }
 
 async function fetchFromCloud(): Promise<Store | null> {
+  if (!supabase) return null;
   try {
-    const res = await fetch(`${API_BASE}/api/data`);
-    if (!res.ok) return null;
-    const data = await res.json();
+    const { data, error } = await supabase.storage.from('warehouse').download(FILE_PATH);
+    if (error || !data) return null;
+    const text = await data.text();
+    const parsed = JSON.parse(text || '{}');
     return {
-      containers: data.containers ?? [],
-      positions: data.positions ?? [],
-      transactions: data.transactions ?? [],
+      containers: parsed.containers ?? [],
+      positions: parsed.positions ?? [],
+      transactions: parsed.transactions ?? [],
     };
   } catch {
     return null;
@@ -26,13 +36,14 @@ async function fetchFromCloud(): Promise<Store | null> {
 }
 
 async function saveToCloud(store: Store): Promise<boolean> {
+  if (!supabase) return false;
   try {
-    const res = await fetch(`${API_BASE}/api/data`, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(store),
+    const json = JSON.stringify(store);
+    const { error } = await supabase.storage.from('warehouse').upload(FILE_PATH, json, {
+      contentType: 'application/json',
+      upsert: true,
     });
-    return res.ok;
+    return !error;
   } catch {
     return false;
   }
