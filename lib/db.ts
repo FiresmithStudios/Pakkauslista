@@ -1,11 +1,8 @@
-import { createClient } from '@libsql/client/web';
+// Use default client: supports file: on Node.js (Vercel) and remote URLs (Turso)
+import { createClient } from '@libsql/client';
 
-const url = process.env.TURSO_DATABASE_URL;
+const url = process.env.TURSO_DATABASE_URL || 'file:/tmp/warehouse.db';
 const authToken = process.env.TURSO_AUTH_TOKEN;
-
-if (!url) {
-  throw new Error('TURSO_DATABASE_URL is required. Add it in Vercel project settings.');
-}
 
 export const db = createClient({
   url,
