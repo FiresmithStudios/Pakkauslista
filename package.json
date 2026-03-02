@@ -3,6 +3,7 @@
   "version": "1.0.0",
   "description": "Lightweight warehouse packing progress tracker",
   "private": true,
+  "type": "module",
   "scripts": {
     "dev": "cd client && npm run dev",
     "build": "cd client && npm install && npm run build",
