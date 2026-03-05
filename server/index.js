@@ -18,6 +18,14 @@ const app = express();
 app.use(cors());
 app.use(express.json({ limit: '10mb' }));
 
+// Ensure JSON errors for body parse failures (e.g. payload too large)
+app.use((err, _req, res, next) => {
+  if (err instanceof SyntaxError && err.status === 400 && 'body' in err) {
+    return res.status(400).json({ error: 'Liian suuri kuva. Kokeile pienempää kuvaa.' });
+  }
+  next(err);
+});
+
 // Serve static files from client/dist in production
 const clientDist = path.join(__dirname, '..', 'client', 'dist');
 app.use(express.static(clientDist));
@@ -159,6 +167,14 @@ app.post('/api/ai-search', async (req, res) => {
 // SPA fallback
 app.get('*', (req, res) => {
   res.sendFile(path.join(clientDist, 'index.html'));
+});
+
+// Global error handler – always return JSON
+app.use((err, _req, res, _next) => {
+  console.error('Unhandled error:', err);
+  res.status(500).json({
+    error: err.message || 'Palvelinvirhe',
+  });
 });
 
 app.listen(PORT, () => {

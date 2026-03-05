@@ -126,6 +126,12 @@ export default function AiSearchScreen() {
       try {
         data = JSON.parse(text);
       } catch {
+        if (res.status === 502 || res.status === 503 || res.status === 504) {
+          throw new Error('Palvelin ei vastaa. Varmista että palvelin on käynnissä (npm run dev tai npm run start).');
+        }
+        if (res.status >= 500) {
+          throw new Error('Palvelinvirhe. Yritä uudelleen hetken kuluttua.');
+        }
         throw new Error('Palvelin palautti virheellisen vastauksen. Yritä uudelleen.');
       }
       if (!res.ok) throw new Error(data.error || 'Haku epäonnistui');
