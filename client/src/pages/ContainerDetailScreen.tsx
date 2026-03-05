@@ -17,7 +17,7 @@ export default function ContainerDetailScreen() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [showAddModal, setShowAddModal] = useState(false);
-  const [addForm, setAddForm] = useState({ positionNumber: '', name: '', totalQuantity: '' });
+  const [addForm, setAddForm] = useState({ positionNumber: '', name: '', totalQuantity: '', notes: '' });
   const [containerMenuOpen, setContainerMenuOpen] = useState(false);
   const [editContainerModal, setEditContainerModal] = useState(false);
   const [editContainerValue, setEditContainerValue] = useState('');
@@ -105,8 +105,9 @@ export default function ContainerDetailScreen() {
         positionNumber: num,
         name: addForm.name.trim(),
         totalQuantity: total,
+        notes: addForm.notes.trim() || undefined,
       });
-      setAddForm({ positionNumber: '', name: '', totalQuantity: '' });
+      setAddForm({ positionNumber: '', name: '', totalQuantity: '', notes: '' });
       setShowAddModal(false);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Virhe');
@@ -224,6 +225,14 @@ export default function ContainerDetailScreen() {
                 onChange={(e) => setAddForm((f) => ({ ...f, totalQuantity: e.target.value }))}
                 style={styles.input}
                 placeholder="100"
+              />
+              <label style={styles.label}>Muistiinpanot (valinnainen)</label>
+              <textarea
+                value={addForm.notes}
+                onChange={(e) => setAddForm((f) => ({ ...f, notes: e.target.value }))}
+                style={styles.textarea}
+                placeholder="Tilauksen numero, asiakas, tuotetiedot jne. – AI käyttää näitä tunnistukseen"
+                rows={4}
               />
               <div style={styles.modalActions}>
                 <button type="button" style={styles.cancelBtn} onClick={() => setShowAddModal(false)}>
@@ -446,6 +455,19 @@ const styles: Record<string, React.CSSProperties> = {
     background: 'var(--color-bg)',
     color: 'var(--color-text)',
     outline: 'none',
+  },
+  textarea: {
+    width: '100%',
+    padding: '12px 14px',
+    marginBottom: 16,
+    fontSize: '1rem',
+    borderRadius: 'var(--radius-sm)',
+    border: '2px solid var(--color-surface-hover)',
+    background: 'var(--color-bg)',
+    color: 'var(--color-text)',
+    outline: 'none',
+    resize: 'vertical',
+    minHeight: 80,
   },
   modalActions: {
     display: 'flex',

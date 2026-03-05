@@ -228,9 +228,7 @@ export default function AiSearchScreen() {
             name: p.name,
             totalQuantity: p.totalQuantity,
             packedQuantity: p.packedQuantity,
-            description: p.description,
-            weight: p.weight,
-            volume: p.volume,
+            notes: p.notes,
           })),
         }),
       });

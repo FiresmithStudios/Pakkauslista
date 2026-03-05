@@ -217,9 +217,7 @@ export interface PositionWithContainer {
   name: string;
   totalQuantity: number;
   packedQuantity: number;
-  weight?: number;
-  volume?: number;
-  description?: string;
+  notes?: string;
   updatedAt: string;
 }
 
@@ -269,9 +267,7 @@ export const positionsApi = {
     positionNumber: number;
     name: string;
     totalQuantity: number;
-    weight?: number;
-    volume?: number;
-    description?: string;
+    notes?: string;
   }): Promise<Position> => {
     const snap = await get(ref(db, 'positions'));
     const positions = snap.val() ?? {};
@@ -288,9 +284,7 @@ export const positionsApi = {
       name: data.name.trim(),
       totalQuantity: data.totalQuantity,
       packedQuantity: 0,
-      weight: data.weight,
-      volume: data.volume,
-      description: data.description,
+      notes: data.notes?.trim() || undefined,
       updatedAt: now(),
     };
     await set(ref(db, `positions/${id}`), sanitize(position as Record<string, unknown>));
@@ -304,9 +298,7 @@ export const positionsApi = {
     const updates: Record<string, unknown> = { updatedAt: now() };
     if (data.name !== undefined) updates.name = data.name.trim();
     if (data.totalQuantity !== undefined) updates.totalQuantity = data.totalQuantity;
-    if (data.weight !== undefined) updates.weight = data.weight;
-    if (data.volume !== undefined) updates.volume = data.volume;
-    if (data.description !== undefined) updates.description = data.description;
+    if (data.notes !== undefined) updates.notes = data.notes?.trim() || undefined;
     await update(ref(db, `positions/${id}`), updates);
     return { ...p, ...updates };
   },
@@ -407,15 +399,15 @@ export async function importData(json: string): Promise<void> {
     });
   }
   for (const p of positions) {
+    const legacy = p as Position & { weight?: number; volume?: number; description?: string };
+    const notes = (legacy.notes ?? [legacy.description, legacy.weight != null && `Paino: ${legacy.weight}`, legacy.volume != null && `Tilavuus: ${legacy.volume}`].filter(Boolean).join('\n')) || undefined;
     await set(ref(db, `positions/${p.id}`), sanitize({
       containerId: p.containerId,
       positionNumber: p.positionNumber,
       name: p.name,
       totalQuantity: p.totalQuantity,
       packedQuantity: p.packedQuantity,
-      weight: p.weight,
-      volume: p.volume,
-      description: p.description,
+      notes,
       updatedAt: p.updatedAt,
     }));
   }

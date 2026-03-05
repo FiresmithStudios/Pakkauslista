@@ -19,7 +19,7 @@ export default function PositionDetailScreen() {
   const [error, setError] = useState<string | null>(null);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
-  const [editForm, setEditForm] = useState({ name: '', totalQuantity: '', weight: '', volume: '', description: '' });
+  const [editForm, setEditForm] = useState({ name: '', totalQuantity: '', notes: '' });
   const inputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -54,9 +54,7 @@ export default function PositionDetailScreen() {
       setEditForm({
         name: position.name,
         totalQuantity: String(position.totalQuantity),
-        weight: position.weight != null ? String(position.weight) : '',
-        volume: position.volume != null ? String(position.volume) : '',
-        description: position.description ?? '',
+        notes: position.notes ?? '',
       });
     }
   }, [position, showEditModal]);
@@ -94,9 +92,7 @@ export default function PositionDetailScreen() {
       const updated = await positionsApi.update(positionId, {
         name: editForm.name.trim(),
         totalQuantity: total,
-        weight: editForm.weight ? parseFloat(editForm.weight) : undefined,
-        volume: editForm.volume ? parseFloat(editForm.volume) : undefined,
-        description: editForm.description.trim() || undefined,
+        notes: editForm.notes.trim() || undefined,
       });
       setPosition(updated);
       setShowEditModal(false);
@@ -213,17 +209,10 @@ export default function PositionDetailScreen() {
               </div>
             </div>
 
-            {(position.weight != null || position.volume != null || position.description) && (
+            {position.notes && (
               <div style={styles.extra}>
-                {position.weight != null && (
-                  <p style={styles.extraRow}>Paino: {position.weight}</p>
-                )}
-                {position.volume != null && (
-                  <p style={styles.extraRow}>Tilavuus: {position.volume}</p>
-                )}
-                {position.description && (
-                  <p style={styles.extraRow}>{position.description}</p>
-                )}
+                <p style={styles.extraLabel}>Muistiinpanot</p>
+                <p style={styles.extraRow}>{position.notes}</p>
               </div>
             )}
 
@@ -267,31 +256,13 @@ export default function PositionDetailScreen() {
                 style={styles.modalInput}
                 placeholder="100"
               />
-              <label style={styles.label}>Paino (valinnainen)</label>
-              <input
-                type="number"
-                step="any"
-                value={editForm.weight}
-                onChange={(e) => setEditForm((f) => ({ ...f, weight: e.target.value }))}
-                style={styles.modalInput}
-                placeholder="—"
-              />
-              <label style={styles.label}>Tilavuus (valinnainen)</label>
-              <input
-                type="number"
-                step="any"
-                value={editForm.volume}
-                onChange={(e) => setEditForm((f) => ({ ...f, volume: e.target.value }))}
-                style={styles.modalInput}
-                placeholder="—"
-              />
-              <label style={styles.label}>Kuvaus (valinnainen)</label>
-              <input
-                type="text"
-                value={editForm.description}
-                onChange={(e) => setEditForm((f) => ({ ...f, description: e.target.value }))}
-                style={styles.modalInput}
-                placeholder="—"
+              <label style={styles.label}>Muistiinpanot (valinnainen)</label>
+              <textarea
+                value={editForm.notes}
+                onChange={(e) => setEditForm((f) => ({ ...f, notes: e.target.value }))}
+                style={styles.textarea}
+                placeholder="Tilauksen numero, asiakas, tuotetiedot jne."
+                rows={4}
               />
               <div style={styles.modalActions}>
                 <button type="button" style={styles.cancelBtn} onClick={() => setShowEditModal(false)}>
@@ -444,10 +415,17 @@ const styles: Record<string, React.CSSProperties> = {
     background: 'var(--color-surface)',
     borderRadius: 'var(--radius-sm)',
   },
-  extraRow: {
+  extraLabel: {
     margin: '0 0 8px',
+    fontSize: '0.85rem',
+    fontWeight: 600,
+    color: 'var(--color-text-muted)',
+  },
+  extraRow: {
+    margin: 0,
     fontSize: '0.95rem',
     color: 'var(--color-text-muted)',
+    whiteSpace: 'pre-wrap',
   },
   actionRow: {
     display: 'flex',
@@ -530,6 +508,19 @@ const styles: Record<string, React.CSSProperties> = {
     background: 'var(--color-bg)',
     color: 'var(--color-text)',
     outline: 'none',
+  },
+  textarea: {
+    width: '100%',
+    padding: '12px 14px',
+    marginBottom: 16,
+    fontSize: '1rem',
+    borderRadius: 'var(--radius-sm)',
+    border: '2px solid var(--color-surface-hover)',
+    background: 'var(--color-bg)',
+    color: 'var(--color-text)',
+    outline: 'none',
+    resize: 'vertical',
+    minHeight: 80,
   },
   overlayWrapper: {
     position: 'fixed',

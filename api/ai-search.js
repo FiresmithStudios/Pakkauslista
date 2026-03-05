@@ -22,6 +22,7 @@ Match by:
 - Client/customer names
 - Product names or descriptions
 - Quantities
+- Notes (each position may have free-form notes with extra identifying info)
 - Any other identifying information
 
 You MUST respond in valid JSON with this exact structure:
@@ -39,7 +40,7 @@ If no position matches, set positionId to null and explain why.`;
 ${labelText}
 ---
 
-Positions in the packing list (each has: container number, position number, name, description, quantities):
+Positions in the packing list (each has: container number, position number, name, notes, quantities):
 ${JSON.stringify(positions, null, 2)}
 
 Return ONLY valid JSON, no other text.`;

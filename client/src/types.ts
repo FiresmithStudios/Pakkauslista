@@ -12,9 +12,7 @@ export interface Position {
   name: string;
   totalQuantity: number;
   packedQuantity: number;
-  weight?: number;
-  volume?: number;
-  description?: string;
+  notes?: string;
   updatedAt: string;
 }
 
