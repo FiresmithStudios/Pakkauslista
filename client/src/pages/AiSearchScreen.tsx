@@ -5,23 +5,48 @@ import { useOperator } from '../OperatorContext';
 import { positionsApi } from '../api';
 import type { PositionWithContainer } from '../store';
 
-/** Preprocess image for better OCR: resize, grayscale, contrast. Returns PNG data URL. */
+/** Otsu's method: find optimal threshold for binarization (black/white). */
+function otsuThreshold(hist: number[], total: number): number {
+  let sum = 0;
+  for (let i = 0; i < 256; i++) sum += i * hist[i];
+  let sumB = 0;
+  let wB = 0;
+  let wF = 0;
+  let maxVar = 0;
+  let bestThresh = 0;
+  for (let t = 0; t < 256; t++) {
+    wB += hist[t];
+    if (wB === 0) continue;
+    wF = total - wB;
+    if (wF === 0) break;
+    sumB += t * hist[t];
+    const mB = sumB / wB;
+    const mF = (sum - sumB) / wF;
+    const varBetween = wB * wF * (mB - mF) ** 2;
+    if (varBetween > maxVar) {
+      maxVar = varBetween;
+      bestThresh = t;
+    }
+  }
+  return bestThresh;
+}
+
+/** High-accuracy preprocessing: scale up, grayscale, Otsu binarization, sharpen. */
 async function preprocessForOcr(imageDataUrl: string): Promise<string> {
   return new Promise((resolve, reject) => {
     const img = new Image();
     img.crossOrigin = 'anonymous';
     img.onload = () => {
-      const maxDim = 2000;
-      const minDim = 1200;
+      const targetDim = 3000;
       let w = img.width;
       let h = img.height;
       const long = Math.max(w, h);
-      if (long < minDim) {
-        const scale = minDim / long;
+      if (long < targetDim) {
+        const scale = targetDim / long;
         w = Math.round(w * scale);
         h = Math.round(h * scale);
-      } else if (long > maxDim) {
-        const scale = maxDim / long;
+      } else if (long > targetDim) {
+        const scale = targetDim / long;
         w = Math.round(w * scale);
         h = Math.round(h * scale);
       }
@@ -33,8 +58,31 @@ async function preprocessForOcr(imageDataUrl: string): Promise<string> {
         reject(new Error('Canvas not supported'));
         return;
       }
-      ctx.filter = 'grayscale(100%) contrast(1.4)';
+      ctx.filter = 'grayscale(100%) contrast(1.3)';
       ctx.drawImage(img, 0, 0, w, h);
+      const imageData = ctx.getImageData(0, 0, w, h);
+      const data = imageData.data;
+      const hist = new Array(256).fill(0);
+      for (let i = 0; i < data.length; i += 4) {
+        const g = Math.round(0.299 * data[i] + 0.587 * data[i + 1] + 0.114 * data[i + 2]);
+        hist[Math.min(255, g)]++;
+      }
+      const thresh = otsuThreshold(hist, w * h);
+      let blackCount = 0;
+      for (let i = 0; i < data.length; i += 4) {
+        const g = 0.299 * data[i] + 0.587 * data[i + 1] + 0.114 * data[i + 2];
+        const v = g >= thresh ? 255 : 0;
+        if (v === 0) blackCount++;
+        data[i] = data[i + 1] = data[i + 2] = v;
+      }
+      const totalPx = w * h;
+      if (blackCount > totalPx / 2) {
+        for (let i = 0; i < data.length; i += 4) {
+          const v = data[i] === 0 ? 255 : 0;
+          data[i] = data[i + 1] = data[i + 2] = v;
+        }
+      }
+      ctx.putImageData(imageData, 0, 0);
       resolve(canvas.toDataURL('image/png'));
     };
     img.onerror = () => reject(new Error('Failed to load image'));
@@ -151,10 +199,17 @@ export default function AiSearchScreen() {
           if (m.status === 'recognizing text') setOcrProgress(`OCR: ${Math.round(m.progress * 100)}%`);
         },
       });
-      await worker.setParameters({ tessedit_pageseg_mode: PSM.AUTO });
-      const { data: ocrData } = await worker.recognize(processedImage);
+      const results: { text: string; conf: number }[] = [];
+      for (const psm of [PSM.SINGLE_BLOCK, PSM.AUTO] as const) {
+        await worker.setParameters({ tessedit_pageseg_mode: psm });
+        const { data } = await worker.recognize(processedImage);
+        const text = data.text?.trim() || '';
+        const conf = data.confidence ?? 0;
+        results.push({ text, conf });
+      }
       await worker.terminate();
-      const labelText = ocrData.text?.trim() || '';
+      const best = results.reduce((a, b) => (a.conf > b.conf ? a : b));
+      const labelText = best.text;
       if (!labelText) {
         setError('Kuvasta ei löytynyt tekstiä. Kokeile selkeämpää kuvaa hyvällä valaistuksella.');
         setSearching(false);
