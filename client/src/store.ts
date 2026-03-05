@@ -18,6 +18,15 @@ function now() {
   return new Date().toISOString();
 }
 
+/** Firebase rejects undefined – strip those keys before writing */
+function sanitize<T extends Record<string, unknown>>(obj: T): T {
+  const out = { ...obj };
+  for (const k of Object.keys(out)) {
+    if (out[k] === undefined) delete out[k];
+  }
+  return out;
+}
+
 // --- Real-time subscriptions ---
 
 export function subscribeToContainers(
@@ -239,7 +248,7 @@ export const positionsApi = {
       description: data.description,
       updatedAt: now(),
     };
-    await set(ref(db, `positions/${id}`), position);
+    await set(ref(db, `positions/${id}`), sanitize(position as Record<string, unknown>));
     return { id, ...position };
   },
 
@@ -353,7 +362,7 @@ export async function importData(json: string): Promise<void> {
     });
   }
   for (const p of positions) {
-    await set(ref(db, `positions/${p.id}`), {
+    await set(ref(db, `positions/${p.id}`), sanitize({
       containerId: p.containerId,
       positionNumber: p.positionNumber,
       name: p.name,
@@ -363,7 +372,7 @@ export async function importData(json: string): Promise<void> {
       volume: p.volume,
       description: p.description,
       updatedAt: p.updatedAt,
-    });
+    }));
   }
   for (const t of transactions) {
     await set(ref(db, `position_transactions/${t.id}`), {
