@@ -4,15 +4,13 @@
   "description": "Lightweight warehouse packing progress tracker",
   "private": true,
   "scripts": {
-    "dev": "concurrently \"npm run dev:server\" \"npm run dev:client\"",
+    "dev": "vercel dev",
     "dev:client": "cd client && npm run dev",
-    "dev:server": "cd server && npm install && npm run dev",
     "build": "cd client && npm install && npm run build",
-    "start": "npm run build && cd server && npm install && npm run start",
     "preview": "cd client && npm run preview"
   },
   "devDependencies": {
-    "concurrently": "^9.0.1",
-    "typescript": "~5.6.2"
+    "typescript": "~5.6.2",
+    "vercel": "^39.0.0"
   }
 }

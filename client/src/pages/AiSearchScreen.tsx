@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { createWorker } from 'tesseract.js';
 import { useOperator } from '../OperatorContext';
 import { positionsApi } from '../api';
 import type { PositionWithContainer } from '../store';
@@ -23,6 +24,7 @@ export default function AiSearchScreen() {
   const [cameraReady, setCameraReady] = useState(false);
   const [capturedImage, setCapturedImage] = useState<string | null>(null);
   const [searching, setSearching] = useState(false);
+  const [ocrProgress, setOcrProgress] = useState('');
   const [result, setResult] = useState<AiSearchResult | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -102,12 +104,28 @@ export default function AiSearchScreen() {
     setSearching(true);
     setError(null);
     setResult(null);
+    setOcrProgress('');
     try {
+      setOcrProgress('Luetaan tekstiä kuvasta...');
+      const worker = await createWorker('fin+eng', 1, {
+        logger: (m) => {
+          if (m.status === 'recognizing text') setOcrProgress(`OCR: ${Math.round(m.progress * 100)}%`);
+        },
+      });
+      const { data: ocrData } = await worker.recognize(capturedImage);
+      await worker.terminate();
+      const labelText = ocrData.text?.trim() || '';
+      if (!labelText) {
+        setError('Kuvasta ei löytynyt tekstiä. Kokeile selkeämpää kuvaa hyvällä valaistuksella.');
+        setSearching(false);
+        return;
+      }
+      setOcrProgress('Haetaan AI-tulosta...');
       const res = await fetch('/api/ai-search', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          image: capturedImage,
+          labelText,
           positions: positions.map((p) => ({
             id: p.id,
             containerNumber: p.containerNumber,
@@ -122,20 +140,20 @@ export default function AiSearchScreen() {
         }),
       });
       const text = await res.text();
-      let data;
+      let apiData: AiSearchResult;
       try {
-        data = JSON.parse(text);
+        apiData = JSON.parse(text) as AiSearchResult;
       } catch {
         if (res.status === 502 || res.status === 503 || res.status === 504) {
-          throw new Error('Palvelin ei vastaa. Varmista että palvelin on käynnissä (npm run dev tai npm run start).');
+          throw new Error('Palvelin ei vastaa. Yritä uudelleen hetken kuluttua.');
         }
         if (res.status >= 500) {
           throw new Error('Palvelinvirhe. Yritä uudelleen hetken kuluttua.');
         }
         throw new Error('Palvelin palautti virheellisen vastauksen. Yritä uudelleen.');
       }
-      if (!res.ok) throw new Error(data.error || 'Haku epäonnistui');
-      setResult(data);
+      if (!res.ok) throw new Error((apiData as { error?: string }).error || 'Haku epäonnistui');
+      setResult(apiData);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Haku epäonnistui');
     } finally {
@@ -231,7 +249,7 @@ export default function AiSearchScreen() {
                   onClick={runSearch}
                   disabled={searching}
                 >
-                  {searching ? 'Haku käynnissä...' : 'Hae position'}
+                  {searching ? (ocrProgress || 'Haku käynnissä...') : 'Hae position'}
                 </button>
               </div>
 
