@@ -27,9 +27,14 @@ export default function PositionCard({ position, containerId }: PositionCardProp
       </div>
       <div style={styles.progress}>
         <ProgressBar value={pct} />
-        <span style={styles.count}>
-          {position.packedQuantity} / {position.totalQuantity}
-        </span>
+        <div style={styles.countRow}>
+          <span style={styles.count}>
+            {position.packedQuantity} / {position.totalQuantity}
+          </span>
+          <span style={styles.left}>
+            {position.totalQuantity - position.packedQuantity} jäljellä
+          </span>
+        </div>
       </div>
     </Link>
   );
@@ -63,12 +68,22 @@ const styles: Record<string, React.CSSProperties> = {
   },
   progress: {
     display: 'flex',
+    flexDirection: 'column',
+    gap: 6,
+  },
+  countRow: {
+    display: 'flex',
+    justifyContent: 'space-between',
     alignItems: 'center',
-    gap: 12,
   },
   count: {
     fontSize: '0.9rem',
     color: 'var(--color-text-muted)',
     whiteSpace: 'nowrap',
+  },
+  left: {
+    fontSize: '0.85rem',
+    color: 'var(--color-accent)',
+    fontWeight: 500,
   },
 };

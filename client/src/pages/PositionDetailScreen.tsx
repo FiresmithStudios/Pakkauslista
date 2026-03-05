@@ -13,6 +13,7 @@ export default function PositionDetailScreen() {
   const { operatorName } = useOperator();
   const [position, setPosition] = useState<Position | null>(null);
   const [lastTransaction, setLastTransaction] = useState<PositionTransaction | null>(null);
+  const [transactions, setTransactions] = useState<PositionTransaction[]>([]);
   const [adjustValue, setAdjustValue] = useState('');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -35,6 +36,7 @@ export default function PositionDetailScreen() {
       setLoading(false);
     });
     const unsubTx = subscribeToTransactions(positionId, (txs) => {
+      setTransactions(txs);
       setLastTransaction(txs[0] ?? null);
     });
     return () => {
@@ -59,10 +61,10 @@ export default function PositionDetailScreen() {
     }
   }, [position, showEditModal]);
 
-  const handleAdjust = async (delta: number) => {
-    if (!positionId || !operatorName || delta === 0) return;
-    const num = parseInt(adjustValue, 10) || 1;
-    const actualDelta = delta > 0 ? num : -num;
+  const handleAdjust = async (direction: number, amount?: number) => {
+    if (!positionId || !operatorName || direction === 0) return;
+    const num = amount ?? (parseInt(adjustValue, 10) || 1);
+    const actualDelta = direction > 0 ? num : -num;
     setError(null);
     try {
       const res = await positionsApi.adjust(positionId, actualDelta, operatorName);
@@ -77,7 +79,7 @@ export default function PositionDetailScreen() {
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter') {
       e.preventDefault();
-      handleAdjust(1);
+      handleAdjust(1, undefined);
     }
   };
 
@@ -120,6 +122,20 @@ export default function PositionDetailScreen() {
     ? (position.packedQuantity / position.totalQuantity) * 100
     : 0;
 
+  const itemsLeft = position ? position.totalQuantity - position.packedQuantity : 0;
+
+  const positiveDeltas = transactions.filter((t) => t.delta > 0).map((t) => t.delta);
+  const lastPositiveDelta = lastTransaction && lastTransaction.delta > 0 ? lastTransaction.delta : null;
+  const mostCommonDelta = (() => {
+    if (positiveDeltas.length === 0) return null;
+    const counts: Record<number, number> = {};
+    for (const d of positiveDeltas) counts[d] = (counts[d] ?? 0) + 1;
+    return Number(Object.entries(counts).sort((a, b) => b[1] - a[1])[0]?.[0]) ?? null;
+  })();
+  const palletEstimate = mostCommonDelta && itemsLeft > 0
+    ? Math.ceil(itemsLeft / mostCommonDelta)
+    : null;
+
   const canAdd = position && position.packedQuantity < position.totalQuantity;
   const canSubtract = position && position.packedQuantity > 0;
 
@@ -145,12 +161,30 @@ export default function PositionDetailScreen() {
 
             <div style={styles.progressSection}>
               <ProgressBar value={pct} />
-              <div style={styles.count}>
-                {position.packedQuantity} / {position.totalQuantity}
+              <div style={styles.countRow}>
+                <span style={styles.count}>
+                  {position.packedQuantity} / {position.totalQuantity}
+                </span>
+                <span style={styles.itemsLeft}>Jäljellä: {itemsLeft} kpl</span>
               </div>
+              {palletEstimate != null && palletEstimate > 0 && (
+                <p style={styles.palletEstimate}>
+                  Arvio: ~{palletEstimate} pallettia jäljellä
+                  {mostCommonDelta && ` (${mostCommonDelta} kpl/palletti)`}
+                </p>
+              )}
             </div>
 
             <div style={styles.adjustSection}>
+              {lastPositiveDelta != null && canAdd && (
+                <button
+                  style={styles.quickAddBtn}
+                  onClick={() => handleAdjust(1, lastPositiveDelta)}
+                  title={`Lisää ${lastPositiveDelta} (edellinen määrä)`}
+                >
+                  +{lastPositiveDelta} (edellinen)
+                </button>
+              )}
               <input
                 ref={inputRef}
                 type="number"
@@ -164,14 +198,14 @@ export default function PositionDetailScreen() {
               <div style={styles.buttons}>
                 <button
                   style={styles.minusBtn}
-                  onClick={() => handleAdjust(-1)}
+                  onClick={() => handleAdjust(-1, undefined)}
                   disabled={!canSubtract}
                 >
                   −
                 </button>
                 <button
                   style={styles.plusBtn}
-                  onClick={() => handleAdjust(1)}
+                  onClick={() => handleAdjust(1, undefined)}
                   disabled={!canAdd}
                 >
                   +
@@ -335,11 +369,37 @@ const styles: Record<string, React.CSSProperties> = {
   progressSection: {
     marginBottom: 32,
   },
-  count: {
+  countRow: {
+    display: 'flex',
+    justifyContent: 'space-between',
+    alignItems: 'center',
     marginTop: 8,
+  },
+  count: {
     fontSize: '1.5rem',
     fontWeight: 600,
     color: 'var(--color-text-muted)',
+  },
+  itemsLeft: {
+    fontSize: '1rem',
+    fontWeight: 500,
+    color: 'var(--color-accent)',
+  },
+  palletEstimate: {
+    margin: '8px 0 0',
+    fontSize: '0.9rem',
+    color: 'var(--color-text-muted)',
+  },
+  quickAddBtn: {
+    width: '100%',
+    padding: '14px 20px',
+    marginBottom: 12,
+    fontSize: '1.1rem',
+    fontWeight: 600,
+    background: 'var(--color-surface)',
+    color: 'var(--color-accent)',
+    borderRadius: 'var(--radius-sm)',
+    border: '2px solid var(--color-accent)',
   },
   adjustSection: {
     marginBottom: 32,

@@ -4,6 +4,7 @@ import { useOperator } from '../OperatorContext';
 import { containersApi, positionsApi, subscribeToContainers, subscribeToPositions } from '../api';
 import type { Container, Position } from '../types';
 import PositionCard from '../components/PositionCard';
+import ProgressBar from '../components/ProgressBar';
 import EmptyState from '../components/EmptyState';
 import ConfirmModal from '../components/ConfirmModal';
 
@@ -150,6 +151,31 @@ export default function ContainerDetailScreen() {
       </header>
 
       {error && <p style={styles.error}>{error}</p>}
+
+      {positions.length > 0 && !loading && (
+        <div style={styles.containerProgress}>
+          {(() => {
+            const totalPacked = positions.reduce((s, p) => s + p.packedQuantity, 0);
+            const totalItems = positions.reduce((s, p) => s + p.totalQuantity, 0);
+            const pct = totalItems > 0 ? (totalPacked / totalItems) * 100 : 0;
+            const left = totalItems - totalPacked;
+            return (
+              <>
+                <div style={styles.containerProgressHeader}>
+                  <span style={styles.containerProgressLabel}>Kontin valmius</span>
+                  <span style={styles.containerProgressCount}>
+                    {totalPacked} / {totalItems} kpl ({Math.round(pct)}%)
+                  </span>
+                </div>
+                <ProgressBar value={pct} />
+                {left > 0 && (
+                  <p style={styles.itemsLeft}>Jäljellä: {left} kpl</p>
+                )}
+              </>
+            );
+          })()}
+        </div>
+      )}
 
       {loading ? (
         <p style={styles.muted}>Ladataan...</p>
@@ -332,6 +358,33 @@ const styles: Record<string, React.CSSProperties> = {
     color: '#f87171',
     margin: '0 0 16px',
     fontSize: '0.9rem',
+  },
+  containerProgress: {
+    marginBottom: 24,
+    padding: 16,
+    background: 'var(--color-surface)',
+    borderRadius: 'var(--radius-sm)',
+  },
+  containerProgressHeader: {
+    display: 'flex',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  containerProgressLabel: {
+    fontSize: '0.9rem',
+    fontWeight: 600,
+    color: 'var(--color-text-muted)',
+  },
+  containerProgressCount: {
+    fontSize: '1rem',
+    fontWeight: 700,
+    color: 'var(--color-text)',
+  },
+  itemsLeft: {
+    margin: '8px 0 0',
+    fontSize: '0.9rem',
+    color: 'var(--color-text-muted)',
   },
   muted: {
     color: 'var(--color-text-muted)',
