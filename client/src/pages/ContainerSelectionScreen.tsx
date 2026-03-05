@@ -116,7 +116,16 @@ export default function ContainerSelectionScreen() {
             <h1 style={styles.title}>Kontit</h1>
             <p style={styles.operator}>Operaattori: {operatorName}</p>
           </div>
-          <button
+          <div style={styles.headerButtons}>
+            <button
+              type="button"
+              onClick={() => navigate('/ai-search')}
+              style={styles.aiSearchBtn}
+              title="AI-tuotehaku etiketin kuvalla"
+            >
+              AI-haku
+            </button>
+            <button
             type="button"
             onClick={async () => {
               const json = await exportDataAsync();
@@ -132,7 +141,8 @@ export default function ContainerSelectionScreen() {
             title="Lataa tietokanta JSON-tiedostona"
           >
             Lataa varmuuskopio
-          </button>
+            </button>
+          </div>
         </div>
       </header>
 
@@ -252,6 +262,21 @@ const styles: Record<string, React.CSSProperties> = {
     justifyContent: 'space-between',
     alignItems: 'flex-start',
     gap: 16,
+  },
+  headerButtons: {
+    display: 'flex',
+    gap: 8,
+    flexWrap: 'wrap',
+  },
+  aiSearchBtn: {
+    padding: '10px 16px',
+    fontSize: '0.9rem',
+    fontWeight: 500,
+    background: 'var(--color-accent)',
+    color: 'var(--color-bg)',
+    borderRadius: 'var(--radius-sm)',
+    whiteSpace: 'nowrap',
+    cursor: 'pointer',
   },
   exportBtn: {
     padding: '10px 16px',

@@ -4,11 +4,15 @@
   "description": "Lightweight warehouse packing progress tracker",
   "private": true,
   "scripts": {
-    "dev": "cd client && npm run dev",
+    "dev": "concurrently \"npm run dev:server\" \"npm run dev:client\"",
+    "dev:client": "cd client && npm run dev",
+    "dev:server": "cd server && npm install && npm run dev",
     "build": "cd client && npm install && npm run build",
+    "start": "npm run build && cd server && npm install && npm run start",
     "preview": "cd client && npm run preview"
   },
   "devDependencies": {
+    "concurrently": "^9.0.1",
     "typescript": "~5.6.2"
   }
 }

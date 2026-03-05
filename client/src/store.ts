@@ -208,7 +208,52 @@ export const containersApi = {
   },
 };
 
+/** Position with container info for AI search context */
+export interface PositionWithContainer {
+  id: string;
+  containerId: string;
+  containerNumber: string;
+  positionNumber: number;
+  name: string;
+  totalQuantity: number;
+  packedQuantity: number;
+  weight?: number;
+  volume?: number;
+  description?: string;
+  updatedAt: string;
+}
+
 export const positionsApi = {
+  /** Get all positions across all open containers with container numbers */
+  listAllWithContainers: async (): Promise<PositionWithContainer[]> => {
+    const [containersSnap, positionsSnap] = await Promise.all([
+      get(ref(db, 'containers')),
+      get(ref(db, 'positions')),
+    ]);
+    const containers = containersSnap.val() ?? {};
+    const positions = positionsSnap.val() ?? {};
+    const containerMap = Object.fromEntries(
+      Object.entries(containers).map(([id, v]) => [id, v as Container])
+    );
+    return Object.entries(positions)
+      .map(([id, v]) => {
+        const p = v as Omit<Position, 'id'>;
+        const c = containerMap[p.containerId];
+        if (!c) return null;
+        return {
+          id,
+          ...p,
+          containerNumber: c.containerNumber,
+        } as PositionWithContainer;
+      })
+      .filter((x): x is PositionWithContainer => x !== null)
+      .filter((p) => !containerMap[p.containerId]?.isClosed)
+      .sort((a, b) => {
+        const cmp = (a.containerNumber || '').localeCompare(b.containerNumber || '');
+        return cmp !== 0 ? cmp : a.positionNumber - b.positionNumber;
+      });
+  },
+
   list: async (containerId: string): Promise<Position[]> => {
     const snap = await get(ref(db, 'positions'));
     const data = snap.val();
