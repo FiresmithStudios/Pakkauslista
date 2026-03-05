@@ -1,13 +1,11 @@
 import { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useOperator } from '../OperatorContext';
-import { positionsApi } from '../api';
+import { positionsApi, subscribeToPosition, subscribeToTransactions } from '../api';
 import type { Position, PositionTransaction } from '../types';
 import ProgressBar from '../components/ProgressBar';
 import TransactionOverlay from '../components/TransactionOverlay';
 import ConfirmModal from '../components/ConfirmModal';
-
-const POLL_INTERVAL = 5000;
 
 export default function PositionDetailScreen() {
   const { containerId, positionId } = useParams<{ containerId: string; positionId: string }>();
@@ -23,35 +21,26 @@ export default function PositionDetailScreen() {
   const [editForm, setEditForm] = useState({ name: '', totalQuantity: '', weight: '', volume: '', description: '' });
   const inputRef = useRef<HTMLInputElement>(null);
 
-  const fetchData = async () => {
-    if (!containerId || !positionId) return;
-    try {
-      const [positions, transactions] = await Promise.all([
-        positionsApi.list(containerId),
-        positionsApi.getTransactions(positionId),
-      ]);
-      const pos = positions.find((p) => p.id === positionId);
-      setPosition(pos ?? null);
-      setLastTransaction(transactions[0] ?? null);
-      setError(null);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Virhe');
-    } finally {
-      setLoading(false);
-    }
-  };
-
   useEffect(() => {
     if (!operatorName) {
       navigate('/', { replace: true });
       return;
     }
-    fetchData();
-  }, [containerId, positionId, operatorName, navigate]);
+  }, [operatorName, navigate]);
 
   useEffect(() => {
-    const id = setInterval(fetchData, POLL_INTERVAL);
-    return () => clearInterval(id);
+    if (!containerId || !positionId) return;
+    const unsubPosition = subscribeToPosition(positionId, containerId, (pos) => {
+      setPosition(pos);
+      setLoading(false);
+    });
+    const unsubTx = subscribeToTransactions(positionId, (txs) => {
+      setLastTransaction(txs[0] ?? null);
+    });
+    return () => {
+      unsubPosition();
+      unsubTx();
+    };
   }, [containerId, positionId]);
 
   useEffect(() => {

@@ -1,13 +1,11 @@
 import { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useOperator } from '../OperatorContext';
-import { containersApi, positionsApi } from '../api';
+import { containersApi, positionsApi, subscribeToContainers, subscribeToPositions } from '../api';
 import type { Container, Position } from '../types';
 import PositionCard from '../components/PositionCard';
 import EmptyState from '../components/EmptyState';
 import ConfirmModal from '../components/ConfirmModal';
-
-const POLL_INTERVAL = 5000;
 
 export default function ContainerDetailScreen() {
   const { containerId } = useParams<{ containerId: string }>();
@@ -25,34 +23,27 @@ export default function ContainerDetailScreen() {
   const [deleteContainerModal, setDeleteContainerModal] = useState(false);
   const nameInputRef = useRef<HTMLInputElement>(null);
 
-  const fetchData = async () => {
-    if (!containerId) return;
-    try {
-      const [c, p] = await Promise.all([
-        containersApi.get(containerId),
-        positionsApi.list(containerId),
-      ]);
-      setContainer(c);
-      setPositions(p);
-      setError(null);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Virhe');
-    } finally {
-      setLoading(false);
-    }
-  };
-
   useEffect(() => {
     if (!operatorName) {
       navigate('/', { replace: true });
       return;
     }
-    fetchData();
-  }, [containerId, operatorName, navigate]);
+  }, [operatorName, navigate]);
 
   useEffect(() => {
-    const id = setInterval(fetchData, POLL_INTERVAL);
-    return () => clearInterval(id);
+    if (!containerId) return;
+    const unsubContainer = subscribeToContainers(false, (list) => {
+      const c = list.find((x) => x.id === containerId || x.containerNumber === containerId);
+      setContainer(c ?? null);
+      setLoading(false);
+    });
+    const unsubPositions = subscribeToPositions(containerId, (list) => {
+      setPositions(list);
+    });
+    return () => {
+      unsubContainer();
+      unsubPositions();
+    };
   }, [containerId]);
 
   useEffect(() => {
@@ -116,7 +107,6 @@ export default function ContainerDetailScreen() {
       });
       setAddForm({ positionNumber: '', name: '', totalQuantity: '' });
       setShowAddModal(false);
-      fetchData();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Virhe');
     }

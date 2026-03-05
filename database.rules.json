@@ -1,0 +1,16 @@
+{
+  "rules": {
+    "containers": {
+      ".read": true,
+      ".write": true
+    },
+    "positions": {
+      ".read": true,
+      ".write": true
+    },
+    "position_transactions": {
+      ".read": true,
+      ".write": true
+    }
+  }
+}

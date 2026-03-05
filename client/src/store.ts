@@ -1,91 +1,14 @@
-import { createClient, SupabaseClient } from '@supabase/supabase-js';
+import {
+  ref,
+  onValue,
+  set,
+  update,
+  remove,
+  get,
+  type Unsubscribe,
+} from 'firebase/database';
+import { db } from './firebase';
 import type { Container, Position, PositionTransaction } from './types';
-
-const STORAGE_KEY = 'warehouse-packing-data';
-const FILE_PATH = 'data.json';
-
-const supabaseUrl = import.meta.env.VITE_SUPABASE_URL ?? '';
-const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY ?? '';
-
-let supabase: SupabaseClient | null = null;
-if (supabaseUrl && supabaseAnonKey) {
-  supabase = createClient(supabaseUrl, supabaseAnonKey);
-}
-
-interface Store {
-  containers: Container[];
-  positions: Position[];
-  transactions: PositionTransaction[];
-}
-
-async function fetchFromCloud(): Promise<Store | null> {
-  if (!supabase) return null;
-  try {
-    const { data, error } = await supabase.storage.from('warehouse').download(FILE_PATH);
-    if (error || !data) return null;
-    const text = await data.text();
-    const parsed = JSON.parse(text || '{}');
-    return {
-      containers: parsed.containers ?? [],
-      positions: parsed.positions ?? [],
-      transactions: parsed.transactions ?? [],
-    };
-  } catch {
-    return null;
-  }
-}
-
-async function saveToCloud(store: Store): Promise<boolean> {
-  if (!supabase) return false;
-  try {
-    const json = JSON.stringify(store);
-    const { error } = await supabase.storage.from('warehouse').upload(FILE_PATH, json, {
-      contentType: 'application/json',
-      upsert: true,
-    });
-    return !error;
-  } catch {
-    return false;
-  }
-}
-
-function loadLocal(): Store {
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    if (raw) {
-      const parsed = JSON.parse(raw) as Store;
-      if (parsed.containers && parsed.positions && parsed.transactions) {
-        return parsed;
-      }
-    }
-  } catch {
-    // ignore
-  }
-  return { containers: [], positions: [], transactions: [] };
-}
-
-function saveLocal(store: Store) {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(store));
-}
-
-let cachedStore: Store | null = null;
-
-async function load(): Promise<Store> {
-  const cloud = await fetchFromCloud();
-  if (cloud) {
-    cachedStore = cloud;
-    saveLocal(cloud);
-    return cloud;
-  }
-  cachedStore = loadLocal();
-  return cachedStore;
-}
-
-async function save(store: Store) {
-  saveLocal(store);
-  cachedStore = store;
-  await saveToCloud(store);
-}
 
 function uuid() {
   return crypto.randomUUID();
@@ -95,83 +18,194 @@ function now() {
   return new Date().toISOString();
 }
 
+// --- Real-time subscriptions ---
+
+export function subscribeToContainers(
+  openOnly: boolean,
+  callback: (containers: Container[]) => void
+): Unsubscribe {
+  const containersRef = ref(db, 'containers');
+  return onValue(containersRef, (snapshot) => {
+    const data = snapshot.val();
+    let list: Container[] = [];
+    if (data) {
+      list = Object.entries(data).map(([id, v]) => ({
+        id,
+        ...(v as Omit<Container, 'id'>),
+      }));
+      list.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+      if (openOnly) list = list.filter((c) => !c.isClosed);
+    }
+    callback(list);
+  });
+}
+
+export function subscribeToPositions(
+  containerId: string,
+  callback: (positions: Position[]) => void
+): Unsubscribe {
+  const positionsRef = ref(db, 'positions');
+  return onValue(positionsRef, (snapshot) => {
+    const data = snapshot.val();
+    let list: Position[] = [];
+    if (data) {
+      list = Object.entries(data)
+        .map(([id, v]) => ({ id, ...(v as Omit<Position, 'id'>) }))
+        .filter((p) => p.containerId === containerId)
+        .sort((a, b) => a.positionNumber - b.positionNumber);
+    }
+    callback(list);
+  });
+}
+
+export function subscribeToPosition(
+  positionId: string,
+  containerId: string,
+  callback: (position: Position | null) => void
+): Unsubscribe {
+  const positionsRef = ref(db, 'positions');
+  return onValue(positionsRef, (snapshot) => {
+    const data = snapshot.val();
+    if (!data || !data[positionId]) {
+      callback(null);
+      return;
+    }
+    const p = data[positionId];
+    if (p.containerId !== containerId) {
+      callback(null);
+      return;
+    }
+    callback({ id: positionId, ...p });
+  });
+}
+
+export function subscribeToTransactions(
+  positionId: string,
+  callback: (transactions: PositionTransaction[]) => void
+): Unsubscribe {
+  const txRef = ref(db, 'position_transactions');
+  return onValue(txRef, (snapshot) => {
+    const data = snapshot.val();
+    let list: PositionTransaction[] = [];
+    if (data) {
+      list = Object.entries(data)
+        .map(([id, v]) => ({ id, ...(v as Omit<PositionTransaction, 'id'>) }))
+        .filter((t) => t.positionId === positionId)
+        .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+    }
+    callback(list);
+  });
+}
+
+// --- Mutations ---
+
 export const containersApi = {
   list: async (openOnly = false): Promise<Container[]> => {
-    const s = await load();
-    let list = [...s.containers].sort(
-      (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
-    );
+    const snap = await get(ref(db, 'containers'));
+    const data = snap.val();
+    if (!data) return [];
+    let list = Object.entries(data).map(([id, v]) => ({
+      id,
+      ...(v as Omit<Container, 'id'>),
+    }));
+    list.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
     if (openOnly) list = list.filter((c) => !c.isClosed);
     return list;
   },
 
   get: async (id: string): Promise<Container> => {
-    const s = await load();
-    const c = s.containers.find((x) => x.id === id || x.containerNumber === id);
-    if (!c) throw new Error('Container not found');
-    return c;
+    const byId = await get(ref(db, `containers/${id}`));
+    if (byId.exists()) {
+      return { id, ...byId.val() };
+    }
+    const snap = await get(ref(db, 'containers'));
+    const data = snap.val();
+    if (data) {
+      const found = Object.entries(data).find(
+        ([_, v]) => (v as Container).containerNumber === id
+      );
+      if (found) return { id: found[0], ...(found[1] as Omit<Container, 'id'>) };
+    }
+    throw new Error('Container not found');
   },
 
   getByNumber: async (number: string): Promise<Container> => {
-    const s = await load();
-    const c = s.containers.find((x) => x.containerNumber === number);
-    if (!c) throw new Error('Container not found');
-    return c;
+    const snap = await get(ref(db, 'containers'));
+    const data = snap.val();
+    if (data) {
+      const found = Object.entries(data).find(
+        ([_, v]) => (v as Container).containerNumber === number
+      );
+      if (found) return { id: found[0], ...(found[1] as Omit<Container, 'id'>) };
+    }
+    throw new Error('Container not found');
   },
 
   create: async (containerNumber: string): Promise<Container> => {
-    const s = await load();
-    const exists = s.containers.some((c) => c.containerNumber === containerNumber);
+    const snap = await get(ref(db, 'containers'));
+    const data = snap.val() ?? {};
+    const exists = Object.values(data).some(
+      (v) => (v as Container).containerNumber === containerNumber
+    );
     if (exists) throw new Error('Container number already exists');
-    const container: Container = {
-      id: uuid(),
+    const id = uuid();
+    const container: Omit<Container, 'id'> = {
       containerNumber: containerNumber.trim(),
       createdAt: now(),
       isClosed: false,
     };
-    s.containers.push(container);
-    await save(s);
-    return container;
+    await set(ref(db, `containers/${id}`), container);
+    return { id, ...container };
   },
 
   update: async (id: string, containerNumber: string): Promise<Container> => {
-    const s = await load();
-    const c = s.containers.find((x) => x.id === id || x.containerNumber === id);
-    if (!c) throw new Error('Container not found');
-    const exists = s.containers.some(
-      (x) => x.containerNumber === containerNumber.trim() && x.id !== c.id
+    const c = await containersApi.get(id);
+    const snap = await get(ref(db, 'containers'));
+    const data = snap.val() ?? {};
+    const exists = Object.entries(data).some(
+      ([k, v]) => k !== c.id && (v as Container).containerNumber === containerNumber.trim()
     );
     if (exists) throw new Error('Container number already exists');
-    c.containerNumber = containerNumber.trim();
-    await save(s);
-    return c;
+    await update(ref(db, `containers/${c.id}`), {
+      containerNumber: containerNumber.trim(),
+    });
+    return { ...c, containerNumber: containerNumber.trim() };
   },
 
   close: async (id: string): Promise<Container> => {
-    const s = await load();
-    const c = s.containers.find((x) => x.id === id || x.containerNumber === id);
-    if (!c) throw new Error('Container not found');
-    c.isClosed = true;
-    await save(s);
-    return c;
+    const c = await containersApi.get(id);
+    await update(ref(db, `containers/${c.id}`), { isClosed: true });
+    return { ...c, isClosed: true };
   },
 
   delete: async (id: string): Promise<void> => {
-    const s = await load();
-    const c = s.containers.find((x) => x.id === id || x.containerNumber === id);
-    if (!c) throw new Error('Container not found');
-    const posIds = s.positions.filter((p) => p.containerId === c.id).map((p) => p.id);
-    s.transactions = s.transactions.filter((t) => !posIds.includes(t.positionId));
-    s.positions = s.positions.filter((p) => p.containerId !== c.id);
-    s.containers = s.containers.filter((x) => x.id !== c.id);
-    await save(s);
+    const c = await containersApi.get(id);
+    const positionsSnap = await get(ref(db, 'positions'));
+    const positions = positionsSnap.val() ?? {};
+    const posIds = Object.entries(positions)
+      .filter(([_, p]) => (p as Position).containerId === c.id)
+      .map(([id]) => id);
+    const txSnap = await get(ref(db, 'position_transactions'));
+    const txs = txSnap.val() ?? {};
+    for (const txId of Object.keys(txs)) {
+      if (posIds.includes((txs as Record<string, PositionTransaction>)[txId].positionId)) {
+        await remove(ref(db, `position_transactions/${txId}`));
+      }
+    }
+    for (const posId of posIds) {
+      await remove(ref(db, `positions/${posId}`));
+    }
+    await remove(ref(db, `containers/${c.id}`));
   },
 };
 
 export const positionsApi = {
   list: async (containerId: string): Promise<Position[]> => {
-    const s = await load();
-    return s.positions
+    const snap = await get(ref(db, 'positions'));
+    const data = snap.val();
+    if (!data) return [];
+    return Object.entries(data)
+      .map(([id, v]) => ({ id, ...(v as Omit<Position, 'id'>) }))
       .filter((p) => p.containerId === containerId)
       .sort((a, b) => a.positionNumber - b.positionNumber);
   },
@@ -185,13 +219,16 @@ export const positionsApi = {
     volume?: number;
     description?: string;
   }): Promise<Position> => {
-    const s = await load();
-    const exists = s.positions.some(
-      (p) => p.containerId === data.containerId && p.positionNumber === data.positionNumber
+    const snap = await get(ref(db, 'positions'));
+    const positions = snap.val() ?? {};
+    const exists = Object.values(positions).some(
+      (p) =>
+        (p as Position).containerId === data.containerId &&
+        (p as Position).positionNumber === data.positionNumber
     );
     if (exists) throw new Error('Position number already exists in this container');
-    const position: Position = {
-      id: uuid(),
+    const id = uuid();
+    const position: Omit<Position, 'id'> = {
       containerId: data.containerId,
       positionNumber: data.positionNumber,
       name: data.name.trim(),
@@ -202,32 +239,33 @@ export const positionsApi = {
       description: data.description,
       updatedAt: now(),
     };
-    s.positions.push(position);
-    await save(s);
-    return position;
+    await set(ref(db, `positions/${id}`), position);
+    return { id, ...position };
   },
 
   update: async (id: string, data: Partial<Position>): Promise<Position> => {
-    const s = await load();
-    const p = s.positions.find((x) => x.id === id);
-    if (!p) throw new Error('Position not found');
-    if (data.name !== undefined) p.name = data.name.trim();
-    if (data.totalQuantity !== undefined) p.totalQuantity = data.totalQuantity;
-    if (data.weight !== undefined) p.weight = data.weight;
-    if (data.volume !== undefined) p.volume = data.volume;
-    if (data.description !== undefined) p.description = data.description;
-    p.updatedAt = now();
-    await save(s);
-    return p;
+    const snap = await get(ref(db, `positions/${id}`));
+    if (!snap.exists()) throw new Error('Position not found');
+    const p = { id, ...snap.val() } as Position;
+    const updates: Record<string, unknown> = { updatedAt: now() };
+    if (data.name !== undefined) updates.name = data.name.trim();
+    if (data.totalQuantity !== undefined) updates.totalQuantity = data.totalQuantity;
+    if (data.weight !== undefined) updates.weight = data.weight;
+    if (data.volume !== undefined) updates.volume = data.volume;
+    if (data.description !== undefined) updates.description = data.description;
+    await update(ref(db, `positions/${id}`), updates);
+    return { ...p, ...updates };
   },
 
   delete: async (id: string): Promise<void> => {
-    const s = await load();
-    const p = s.positions.find((x) => x.id === id);
-    if (!p) throw new Error('Position not found');
-    s.transactions = s.transactions.filter((t) => t.positionId !== id);
-    s.positions = s.positions.filter((x) => x.id !== id);
-    await save(s);
+    const txSnap = await get(ref(db, 'position_transactions'));
+    const txs = txSnap.val() ?? {};
+    for (const txId of Object.keys(txs)) {
+      if ((txs as Record<string, PositionTransaction>)[txId].positionId === id) {
+        await remove(ref(db, `position_transactions/${txId}`));
+      }
+    }
+    await remove(ref(db, `positions/${id}`));
   },
 
   adjust: async (
@@ -235,63 +273,104 @@ export const positionsApi = {
     delta: number,
     operatorName: string
   ): Promise<{ position: Position; lastTransaction: PositionTransaction | null }> => {
-    const s = await load();
-    const p = s.positions.find((x) => x.id === id);
-    if (!p) throw new Error('Position not found');
+    const snap = await get(ref(db, `positions/${id}`));
+    if (!snap.exists()) throw new Error('Position not found');
+    const p = { id, ...snap.val() } as Position;
     const newPacked = p.packedQuantity + delta;
     if (newPacked < 0) throw new Error('Packed quantity cannot go below 0');
     if (newPacked > p.totalQuantity) throw new Error('Packed quantity cannot exceed total quantity');
 
-    const tx: PositionTransaction = {
-      id: uuid(),
+    const txId = uuid();
+    const tx: Omit<PositionTransaction, 'id'> = {
       positionId: id,
       delta,
       operatorName: operatorName.trim(),
       createdAt: now(),
     };
-    s.transactions.push(tx);
-    p.packedQuantity = newPacked;
-    p.updatedAt = now();
-    await save(s);
+    await set(ref(db, `position_transactions/${txId}`), tx);
+    await update(ref(db, `positions/${id}`), {
+      packedQuantity: newPacked,
+      updatedAt: now(),
+    });
 
     return {
-      position: p,
-      lastTransaction: tx,
+      position: { ...p, packedQuantity: newPacked, updatedAt: now() },
+      lastTransaction: { id: txId, ...tx },
     };
   },
 
   getTransactions: async (id: string): Promise<PositionTransaction[]> => {
-    const s = await load();
-    return s.transactions
+    const snap = await get(ref(db, 'position_transactions'));
+    const data = snap.val();
+    if (!data) return [];
+    return Object.entries(data)
+      .map(([txId, v]) => ({ id: txId, ...(v as Omit<PositionTransaction, 'id'>) }))
       .filter((t) => t.positionId === id)
       .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
   },
 };
 
-export function exportData(): string {
-  const s = cachedStore ?? loadLocal();
+// --- Export / Import ---
+
+export async function exportDataAsync(): Promise<string> {
+  const [containersSnap, positionsSnap, txSnap] = await Promise.all([
+    get(ref(db, 'containers')),
+    get(ref(db, 'positions')),
+    get(ref(db, 'position_transactions')),
+  ]);
+  const containers = containersSnap.val() ?? {};
+  const positions = positionsSnap.val() ?? {};
+  const transactions = txSnap.val() ?? {};
+  const containerList = Object.entries(containers).map(([id, v]) => ({ id, ...(v as Omit<Container, 'id'>) }));
+  const positionList = Object.entries(positions).map(([id, v]) => ({ id, ...(v as Omit<Position, 'id'>) }));
+  const txList = Object.entries(transactions).map(([id, v]) => ({ id, ...(v as Omit<PositionTransaction, 'id'>) }));
   return JSON.stringify(
-    {
-      exportedAt: now(),
-      containers: s.containers,
-      positions: s.positions,
-      transactions: s.transactions,
-    },
+    { exportedAt: now(), containers: containerList, positions: positionList, transactions: txList },
     null,
     2
   );
 }
 
-export function importData(json: string): void {
+export function exportData(): string {
+  return JSON.stringify({ exportedAt: now(), containers: [], positions: [], transactions: [] }, null, 2);
+}
+
+export async function importData(json: string): Promise<void> {
   const parsed = JSON.parse(json) as {
     containers?: Container[];
     positions?: Position[];
     transactions?: PositionTransaction[];
   };
-  const store: Store = {
-    containers: Array.isArray(parsed.containers) ? parsed.containers : [],
-    positions: Array.isArray(parsed.positions) ? parsed.positions : [],
-    transactions: Array.isArray(parsed.transactions) ? parsed.transactions : [],
-  };
-  saveLocal(store);
+  const containers = Array.isArray(parsed.containers) ? parsed.containers : [];
+  const positions = Array.isArray(parsed.positions) ? parsed.positions : [];
+  const transactions = Array.isArray(parsed.transactions) ? parsed.transactions : [];
+
+  for (const c of containers) {
+    await set(ref(db, `containers/${c.id}`), {
+      containerNumber: c.containerNumber,
+      createdAt: c.createdAt,
+      isClosed: c.isClosed,
+    });
+  }
+  for (const p of positions) {
+    await set(ref(db, `positions/${p.id}`), {
+      containerId: p.containerId,
+      positionNumber: p.positionNumber,
+      name: p.name,
+      totalQuantity: p.totalQuantity,
+      packedQuantity: p.packedQuantity,
+      weight: p.weight,
+      volume: p.volume,
+      description: p.description,
+      updatedAt: p.updatedAt,
+    });
+  }
+  for (const t of transactions) {
+    await set(ref(db, `position_transactions/${t.id}`), {
+      positionId: t.positionId,
+      delta: t.delta,
+      operatorName: t.operatorName,
+      createdAt: t.createdAt,
+    });
+  }
 }

@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useOperator } from '../OperatorContext';
-import { containersApi, exportData } from '../api';
+import { containersApi, exportDataAsync, subscribeToContainers } from '../api';
 import type { Container } from '../types';
 import ConfirmModal from '../components/ConfirmModal';
 
@@ -18,13 +18,6 @@ export default function ContainerSelectionScreen() {
   const [deleteModal, setDeleteModal] = useState<Container | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
-  const fetchContainers = () => {
-    containersApi.list(true).then(
-      setContainers,
-      (err) => setError(err.message)
-    );
-  };
-
   useEffect(() => {
     if (!operatorName) {
       navigate('/', { replace: true });
@@ -32,12 +25,11 @@ export default function ContainerSelectionScreen() {
   }, [operatorName, navigate]);
 
   useEffect(() => {
-    let cancelled = false;
-    containersApi.list(true).then(
-      (data) => { if (!cancelled) setContainers(data); },
-      (err) => { if (!cancelled) setError(err.message); }
-    ).finally(() => { if (!cancelled) setLoading(false); });
-    return () => { cancelled = true; };
+    const unsub = subscribeToContainers(true, (data) => {
+      setContainers(data);
+      setLoading(false);
+    });
+    return unsub;
   }, []);
 
   useEffect(() => {
@@ -70,7 +62,6 @@ export default function ContainerSelectionScreen() {
     try {
       await containersApi.update(editModal.id, editValue.trim());
       setEditModal(null);
-      fetchContainers();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Virhe');
     }
@@ -81,7 +72,6 @@ export default function ContainerSelectionScreen() {
     setError(null);
     try {
       await containersApi.close(c.id);
-      fetchContainers();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Virhe');
     }
@@ -93,7 +83,6 @@ export default function ContainerSelectionScreen() {
     try {
       await containersApi.delete(deleteModal.id);
       setDeleteModal(null);
-      fetchContainers();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Virhe');
     }
@@ -129,8 +118,9 @@ export default function ContainerSelectionScreen() {
           </div>
           <button
             type="button"
-            onClick={() => {
-              const blob = new Blob([exportData()], { type: 'application/json' });
+            onClick={async () => {
+              const json = await exportDataAsync();
+              const blob = new Blob([json], { type: 'application/json' });
               const url = URL.createObjectURL(blob);
               const a = document.createElement('a');
               a.href = url;
