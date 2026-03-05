@@ -47,24 +47,41 @@ export default function AiSearchScreen() {
     setError(null);
     try {
       const stream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: 'environment', width: { ideal: 1920 }, height: { ideal: 1080 } },
+        video: {
+          facingMode: 'environment',
+          width: { ideal: 1280, min: 640 },
+          height: { ideal: 720, min: 480 },
+        },
       });
       streamRef.current = stream;
-      if (videoRef.current) {
-        videoRef.current.srcObject = stream;
-      }
       setCameraReady(true);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Kameran käyttöoikeus evätty');
     }
   };
 
+  // Set video srcObject after React has rendered the video element (critical for iOS)
+  useEffect(() => {
+    if (!cameraReady || !streamRef.current || !videoRef.current) return;
+    const video = videoRef.current;
+    video.srcObject = streamRef.current;
+    const onLoaded = () => video.play().catch(() => {});
+    video.addEventListener('loadedmetadata', onLoaded);
+    return () => video.removeEventListener('loadedmetadata', onLoaded);
+  }, [cameraReady]);
+
   const capturePhoto = () => {
     if (!videoRef.current || !streamRef.current) return;
     const video = videoRef.current;
+    const w = video.videoWidth;
+    const h = video.videoHeight;
+    if (!w || !h) {
+      setError('Kamera ei ole vielä valmis. Odota hetki ja yritä uudelleen.');
+      return;
+    }
     const canvas = document.createElement('canvas');
-    canvas.width = video.videoWidth;
-    canvas.height = video.videoHeight;
+    canvas.width = w;
+    canvas.height = h;
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
     ctx.drawImage(video, 0, 0);
@@ -104,7 +121,13 @@ export default function AiSearchScreen() {
           })),
         }),
       });
-      const data = await res.json();
+      const text = await res.text();
+      let data;
+      try {
+        data = JSON.parse(text);
+      } catch {
+        throw new Error('Palvelin palautti virheellisen vastauksen. Yritä uudelleen.');
+      }
       if (!res.ok) throw new Error(data.error || 'Haku epäonnistui');
       setResult(data);
     } catch (err) {
@@ -152,11 +175,7 @@ export default function AiSearchScreen() {
                   <p style={styles.cameraHint}>
                     Ota kuva tuotteen etiketistä. Varmista hyvä valaistus ja tarkkuus.
                   </p>
-                  <button style={styles.primaryBtn} onClick={startCamera}>
-                    Avaa kamera
-                  </button>
-                  <label style={styles.fileLabel}>
-                    tai valitse kuva tiedostosta
+                  <label style={styles.fileLabelPrimary}>
                     <input
                       type="file"
                       accept="image/*"
@@ -172,7 +191,12 @@ export default function AiSearchScreen() {
                         e.target.value = '';
                       }}
                     />
+                    📷 Ota kuva (suositus puhelimella)
                   </label>
+                  <p style={styles.orText}>tai</p>
+                  <button style={styles.secondaryBtn} onClick={startCamera}>
+                    Avaa live-kamera
+                  </button>
                 </div>
               ) : (
                 <div style={styles.cameraView}>
@@ -300,9 +324,11 @@ const styles: Record<string, React.CSSProperties> = {
   },
   video: {
     width: '100%',
-    display: 'block',
+    minHeight: 300,
     maxHeight: '60vh',
-    objectFit: 'contain',
+    display: 'block',
+    objectFit: 'cover',
+    backgroundColor: '#000',
   },
   captureBtn: {
     display: 'block',
@@ -330,6 +356,22 @@ const styles: Record<string, React.CSSProperties> = {
     background: 'var(--color-surface-hover)',
     color: 'var(--color-text)',
     marginRight: 12,
+  },
+  fileLabelPrimary: {
+    display: 'inline-block',
+    padding: '16px 24px',
+    fontSize: '1.1rem',
+    fontWeight: 600,
+    background: 'var(--color-accent)',
+    color: 'var(--color-bg)',
+    borderRadius: 'var(--radius-sm)',
+    cursor: 'pointer',
+    marginBottom: 12,
+  },
+  orText: {
+    margin: '12px 0',
+    color: 'var(--color-text-muted)',
+    fontSize: '0.9rem',
   },
   fileLabel: {
     display: 'block',

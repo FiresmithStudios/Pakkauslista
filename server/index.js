@@ -24,7 +24,23 @@ app.use(express.static(clientDist));
 
 /** Run OCR on base64 image data */
 async function runOcr(base64Data) {
-  const buffer = Buffer.from(base64Data.replace(/^data:image\/\w+;base64,/, ''), 'base64');
+  if (!base64Data || typeof base64Data !== 'string') {
+    throw new Error('Invalid image data');
+  }
+  const base64Match = base64Data.match(/^data:image\/[a-zA-Z+]+;base64,([\s\S]+)$/);
+  const base64Str = base64Match ? base64Match[1] : base64Data.replace(/^data:[^;]+;base64,/, '');
+  if (!base64Str || base64Str.length < 100) {
+    throw new Error('Image data too small or invalid. The photo may be blank or corrupted.');
+  }
+  let buffer;
+  try {
+    buffer = Buffer.from(base64Str, 'base64');
+  } catch (e) {
+    throw new Error('Invalid image format. Please try taking a new photo.');
+  }
+  if (buffer.length < 100) {
+    throw new Error('Image data too small. The photo may be blank or corrupted.');
+  }
   const result = await Tesseract.recognize(buffer, 'fin+eng', {
     logger: () => {},
   });
@@ -88,10 +104,15 @@ Return ONLY valid JSON, no other text.`;
   const content = data.choices?.[0]?.message?.content?.trim();
   if (!content) throw new Error('Empty response from DeepSeek');
 
+  // Extract JSON from response (AI may wrap in markdown code blocks)
+  let jsonStr = content.trim();
+  const jsonMatch = jsonStr.match(/```(?:json)?\s*([\s\S]*?)```/);
+  if (jsonMatch) jsonStr = jsonMatch[1].trim();
+
   try {
-    const parsed = JSON.parse(content);
+    const parsed = JSON.parse(jsonStr);
     return parsed;
-  } catch {
+  } catch (e) {
     return {
       positionId: null,
       confidence: 'low',
@@ -108,10 +129,17 @@ app.post('/api/ai-search', async (req, res) => {
       return res.status(400).json({ error: 'Missing image (base64) or positions array' });
     }
 
-    const labelText = await runOcr(image);
+    let labelText;
+    try {
+      labelText = await runOcr(image);
+    } catch (ocrErr) {
+      return res.status(400).json({
+        error: ocrErr.message || 'OCR could not read the image. Try a clearer photo with good lighting.',
+      });
+    }
     if (!labelText) {
       return res.status(400).json({
-        error: 'OCR could not extract any text from the image. Try a clearer photo.',
+        error: 'OCR could not extract any text from the image. The photo may be too dark or blurry. Try a clearer photo with good lighting.',
       });
     }
 
