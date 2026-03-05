@@ -1,9 +1,46 @@
 import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { createWorker } from 'tesseract.js';
+import { createWorker, PSM } from 'tesseract.js';
 import { useOperator } from '../OperatorContext';
 import { positionsApi } from '../api';
 import type { PositionWithContainer } from '../store';
+
+/** Preprocess image for better OCR: resize, grayscale, contrast. Returns PNG data URL. */
+async function preprocessForOcr(imageDataUrl: string): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.crossOrigin = 'anonymous';
+    img.onload = () => {
+      const maxDim = 2000;
+      const minDim = 1200;
+      let w = img.width;
+      let h = img.height;
+      const long = Math.max(w, h);
+      if (long < minDim) {
+        const scale = minDim / long;
+        w = Math.round(w * scale);
+        h = Math.round(h * scale);
+      } else if (long > maxDim) {
+        const scale = maxDim / long;
+        w = Math.round(w * scale);
+        h = Math.round(h * scale);
+      }
+      const canvas = document.createElement('canvas');
+      canvas.width = w;
+      canvas.height = h;
+      const ctx = canvas.getContext('2d');
+      if (!ctx) {
+        reject(new Error('Canvas not supported'));
+        return;
+      }
+      ctx.filter = 'grayscale(100%) contrast(1.4)';
+      ctx.drawImage(img, 0, 0, w, h);
+      resolve(canvas.toDataURL('image/png'));
+    };
+    img.onerror = () => reject(new Error('Failed to load image'));
+    img.src = imageDataUrl;
+  });
+}
 
 interface AiSearchResult {
   labelText: string;
@@ -87,7 +124,7 @@ export default function AiSearchScreen() {
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
     ctx.drawImage(video, 0, 0);
-    const dataUrl = canvas.toDataURL('image/jpeg', 0.9);
+    const dataUrl = canvas.toDataURL('image/png');
     setCapturedImage(dataUrl);
     streamRef.current.getTracks().forEach((t) => t.stop());
     setCameraReady(false);
@@ -106,13 +143,16 @@ export default function AiSearchScreen() {
     setResult(null);
     setOcrProgress('');
     try {
+      setOcrProgress('Käsitellään kuvaa...');
+      const processedImage = await preprocessForOcr(capturedImage);
       setOcrProgress('Luetaan tekstiä kuvasta...');
       const worker = await createWorker('fin+eng', 1, {
         logger: (m) => {
           if (m.status === 'recognizing text') setOcrProgress(`OCR: ${Math.round(m.progress * 100)}%`);
         },
       });
-      const { data: ocrData } = await worker.recognize(capturedImage);
+      await worker.setParameters({ tessedit_pageseg_mode: PSM.AUTO });
+      const { data: ocrData } = await worker.recognize(processedImage);
       await worker.terminate();
       const labelText = ocrData.text?.trim() || '';
       if (!labelText) {
