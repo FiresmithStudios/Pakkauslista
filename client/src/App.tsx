@@ -5,6 +5,7 @@ import ContainerSelectionScreen from './pages/ContainerSelectionScreen';
 import ContainerDetailScreen from './pages/ContainerDetailScreen';
 import PositionDetailScreen from './pages/PositionDetailScreen';
 import AiSearchScreen from './pages/AiSearchScreen';
+import AiSetupScreen from './pages/AiSetupScreen';
 
 function App() {
   return (
@@ -15,6 +16,7 @@ function App() {
         <Route path="/containers/:containerId" element={<ContainerDetailScreen />} />
         <Route path="/containers/:containerId/positions/:positionId" element={<PositionDetailScreen />} />
         <Route path="/ai-search" element={<AiSearchScreen />} />
+        <Route path="/ai-setup" element={<AiSetupScreen />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </OperatorProvider>

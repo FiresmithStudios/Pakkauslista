@@ -119,6 +119,14 @@ export default function ContainerSelectionScreen() {
           <div style={styles.headerButtons}>
             <button
               type="button"
+              onClick={() => navigate('/ai-setup')}
+              style={styles.aiSetupBtn}
+              title="Luo kontti skannaamalla purkulista"
+            >
+              AI-setup
+            </button>
+            <button
+              type="button"
               onClick={() => navigate('/ai-search')}
               style={styles.aiSearchBtn}
               title="AI-tuotehaku etiketin kuvalla"
@@ -267,6 +275,16 @@ const styles: Record<string, React.CSSProperties> = {
     display: 'flex',
     gap: 8,
     flexWrap: 'wrap',
+  },
+  aiSetupBtn: {
+    padding: '10px 16px',
+    fontSize: '0.9rem',
+    fontWeight: 500,
+    background: 'var(--color-accent)',
+    color: 'var(--color-bg)',
+    borderRadius: 'var(--radius-sm)',
+    whiteSpace: 'nowrap',
+    cursor: 'pointer',
   },
   aiSearchBtn: {
     padding: '10px 16px',
