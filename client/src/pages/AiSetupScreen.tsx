@@ -265,7 +265,6 @@ export default function AiSetupScreen() {
     setStep('container');
     setPageImages([]);
     setPositions([]);
-    setContainerInfo(null);
     setVerification(null);
   };
 
