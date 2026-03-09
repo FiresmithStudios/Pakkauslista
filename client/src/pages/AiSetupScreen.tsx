@@ -35,7 +35,6 @@ export default function AiSetupScreen() {
   const [containerNumber, setContainerNumber] = useState('');
   const [pageImages, setPageImages] = useState<string[]>([]);
   const [positions, setPositions] = useState<ExtractedPosition[]>([]);
-  const [containerInfo, setContainerInfo] = useState<ExtractedContainerInfo | null>(null);
   const [verification, setVerification] = useState<{
     verified: boolean;
     issues: Array<{ positionNumber: number | null; severity: string; message: string }>;
@@ -155,7 +154,6 @@ export default function AiSetupScreen() {
     setError(null);
     setVerification(null);
     let allPositions: ExtractedPosition[] = [];
-    let firstContainerInfo: ExtractedContainerInfo | null = null;
 
     try {
       for (let i = 0; i < pageImages.length; i++) {
@@ -180,15 +178,11 @@ export default function AiSetupScreen() {
         if (data.positions?.length) {
           allPositions = mergePositions(allPositions, data.positions);
         }
-        if (i === 0 && data.extractedContainerInfo) {
-          firstContainerInfo = data.extractedContainerInfo;
-          if (data.extractedContainerInfo.containerNumber && !containerNumber) {
-            setContainerNumber(data.extractedContainerInfo.containerNumber);
-          }
+        if (i === 0 && data.extractedContainerInfo?.containerNumber && !containerNumber) {
+          setContainerNumber(data.extractedContainerInfo.containerNumber);
         }
       }
       setPositions(allPositions);
-      setContainerInfo(firstContainerInfo);
       setStep('review');
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Käsittely epäonnistui');
