@@ -12,6 +12,10 @@
   --radius: 12px;
   --radius-sm: 8px;
   --shadow: 0 4px 6px -1px rgb(0 0 0 / 0.2);
+  --color-topbar-bg: rgba(15, 23, 42, 0.58);
+  --color-topbar-border: rgba(148, 163, 184, 0.2);
+  --color-glass: rgba(30, 41, 59, 0.55);
+  --ease-smooth: cubic-bezier(0.22, 1, 0.36, 1);
 }
 
 [data-theme="light"] {
@@ -25,6 +29,10 @@
   --color-progress: #2563eb;
   --color-grey: #94a3b8;
   --shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1);
+  --color-topbar-bg: rgba(248, 250, 252, 0.6);
+  --color-topbar-border: rgba(100, 116, 139, 0.22);
+  --color-glass: rgba(255, 255, 255, 0.58);
+  --ease-smooth: cubic-bezier(0.22, 1, 0.36, 1);
 }
 
 /* Dark is default. Light only when data-theme="light" explicitly. */
@@ -40,6 +48,10 @@
     --color-progress: #2563eb;
     --color-grey: #94a3b8;
     --shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1);
+    --color-topbar-bg: rgba(248, 250, 252, 0.6);
+    --color-topbar-border: rgba(100, 116, 139, 0.22);
+    --color-glass: rgba(255, 255, 255, 0.58);
+    --ease-smooth: cubic-bezier(0.22, 1, 0.36, 1);
   }
 }
 
@@ -65,10 +77,18 @@ button {
   font-family: inherit;
   cursor: pointer;
   border: none;
+  transition: transform 180ms var(--ease-smooth), background-color 180ms var(--ease-smooth), color 180ms var(--ease-smooth), box-shadow 180ms var(--ease-smooth), opacity 180ms var(--ease-smooth);
 }
 
 input {
   font-family: inherit;
+  transition: border-color 180ms var(--ease-smooth), box-shadow 180ms var(--ease-smooth), background-color 180ms var(--ease-smooth);
+}
+
+select,
+textarea {
+  font-family: inherit;
+  transition: border-color 180ms var(--ease-smooth), box-shadow 180ms var(--ease-smooth), background-color 180ms var(--ease-smooth);
 }
 
 a {
@@ -78,4 +98,28 @@ a {
 
 a:hover {
   text-decoration: underline;
+}
+
+button:active {
+  transform: scale(0.98);
+}
+
+@keyframes fadeInSoft {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes slideInLeftSoft {
+  from {
+    opacity: 0;
+    transform: translateX(-12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
 }
