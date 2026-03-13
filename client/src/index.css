@@ -27,8 +27,9 @@
   --shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1);
 }
 
+/* Dark is default. Light only when data-theme="light" explicitly. */
 @media (prefers-color-scheme: light) {
-  :root:not([data-theme]) {
+  [data-theme="system"] {
     --color-bg: #f8fafc;
     --color-surface: #ffffff;
     --color-surface-hover: #e2e8f0;

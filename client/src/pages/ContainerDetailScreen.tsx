@@ -9,6 +9,7 @@ import EmptyState from '../components/EmptyState';
 import ConfirmModal from '../components/ConfirmModal';
 import AddPositionWithAiModal from '../components/AddPositionWithAiModal';
 import { logEvent } from '../services/eventsService';
+import { IconBack, IconBox, IconPlus, IconSparkles, IconEdit, IconTrash, IconMore } from '../components/Icons';
 
 export default function ContainerDetailScreen() {
   const { containerId } = useParams<{ containerId: string }>();
@@ -20,6 +21,7 @@ export default function ContainerDetailScreen() {
   const [error, setError] = useState<string | null>(null);
   const [showAddModal, setShowAddModal] = useState(false);
   const [showAiAddModal, setShowAiAddModal] = useState(false);
+  const [fabExpanded, setFabExpanded] = useState(false);
   const [addForm, setAddForm] = useState({ positionNumber: '', name: '', totalQuantity: '', notes: '' });
   const [containerMenuOpen, setContainerMenuOpen] = useState(false);
   const [editContainerModal, setEditContainerModal] = useState(false);
@@ -160,9 +162,11 @@ export default function ContainerDetailScreen() {
     <div style={styles.container}>
       <header style={styles.header}>
         <button style={styles.backButton} onClick={() => navigate('/containers')}>
-          ← Takaisin
+          <IconBack />
+          <span>Takaisin</span>
         </button>
         <div style={styles.titleRow}>
+          <IconBox />
           <h1 style={styles.title}>{container?.containerNumber ?? '...'}</h1>
           {container && !container.isClosed && (
             <div style={styles.headerMenuWrap}>
@@ -171,18 +175,20 @@ export default function ContainerDetailScreen() {
                 onClick={() => setContainerMenuOpen(!containerMenuOpen)}
                 aria-label="Valikko"
               >
-                ⋮
+                <IconMore />
               </button>
               {containerMenuOpen && (
                 <div style={styles.headerMenu}>
                   <button style={styles.menuItem} onClick={() => { setEditContainerModal(true); setContainerMenuOpen(false); }}>
-                    Muokkaa konttia
+                    <IconEdit />
+                    <span>Muokkaa konttia</span>
                   </button>
                   <button style={styles.menuItem} onClick={handleCloseContainer}>
                     Sulje kontti
                   </button>
                   <button style={styles.menuItemDanger} onClick={() => { setDeleteContainerModal(true); setContainerMenuOpen(false); }}>
-                    Poista kontti
+                    <IconTrash />
+                    <span>Poista kontti</span>
                   </button>
                 </div>
               )}
@@ -230,12 +236,31 @@ export default function ContainerDetailScreen() {
         </div>
       )}
 
-      <div style={styles.fabRow}>
-        <button style={styles.fabSecondary} onClick={() => setShowAiAddModal(true)}>
-          AI: Lisää positio
-        </button>
-        <button style={styles.fab} onClick={() => setShowAddModal(true)}>
-          + Lisää positio
+      <div style={styles.fabWrap}>
+        {fabExpanded && (
+          <div style={styles.fabMenu}>
+            <button
+              style={styles.fabOption}
+              onClick={() => { setShowAiAddModal(true); setFabExpanded(false); }}
+            >
+              <IconSparkles />
+              <span>AI</span>
+            </button>
+            <button
+              style={styles.fabOption}
+              onClick={() => { setShowAddModal(true); setFabExpanded(false); }}
+            >
+              <IconPlus />
+              <span>Manuaalinen</span>
+            </button>
+          </div>
+        )}
+        <button
+          style={{ ...styles.fab, ...(fabExpanded ? styles.fabRotate : {}) }}
+          onClick={() => setFabExpanded(!fabExpanded)}
+          aria-label="Lisää positio"
+        >
+          <IconPlus />
         </button>
       </div>
 
@@ -389,7 +414,9 @@ const styles: Record<string, React.CSSProperties> = {
     zIndex: 10,
   },
   menuItem: {
-    display: 'block',
+    display: 'flex',
+    alignItems: 'center',
+    gap: 10,
     width: '100%',
     padding: '12px 20px',
     textAlign: 'left',
@@ -398,7 +425,9 @@ const styles: Record<string, React.CSSProperties> = {
     fontSize: '1rem',
   },
   menuItemDanger: {
-    display: 'block',
+    display: 'flex',
+    alignItems: 'center',
+    gap: 10,
     width: '100%',
     padding: '12px 20px',
     textAlign: 'left',
@@ -407,6 +436,9 @@ const styles: Record<string, React.CSSProperties> = {
     fontSize: '1rem',
   },
   backButton: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: 8,
     background: 'none',
     color: 'var(--color-accent)',
     fontWeight: 500,
@@ -459,34 +491,46 @@ const styles: Record<string, React.CSSProperties> = {
     flexDirection: 'column',
     gap: 12,
   },
-  fabRow: {
+  fabWrap: {
     position: 'fixed',
     bottom: 24,
-    left: 24,
     right: 24,
     display: 'flex',
+    flexDirection: 'column',
+    alignItems: 'flex-end',
     gap: 12,
   },
+  fabMenu: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: 8,
+    marginBottom: 4,
+  },
+  fabOption: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: 10,
+    padding: '12px 20px',
+    background: 'var(--color-surface)',
+    color: 'var(--color-text)',
+    borderRadius: 'var(--radius-sm)',
+    boxShadow: 'var(--shadow)',
+    border: '2px solid var(--color-surface-hover)',
+    fontSize: '0.95rem',
+  },
   fab: {
-    flex: 1,
-    padding: '18px 24px',
-    fontSize: '1.125rem',
-    fontWeight: 600,
+    width: 56,
+    height: 56,
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
     background: 'var(--color-accent)',
     color: 'var(--color-bg)',
-    borderRadius: 'var(--radius-sm)',
+    borderRadius: '50%',
     boxShadow: 'var(--shadow)',
   },
-  fabSecondary: {
-    flex: 1,
-    padding: '18px 24px',
-    fontSize: '1rem',
-    fontWeight: 600,
-    background: 'var(--color-surface)',
-    color: 'var(--color-accent)',
-    borderRadius: 'var(--radius-sm)',
-    border: '2px solid var(--color-accent)',
-    boxShadow: 'var(--shadow)',
+  fabRotate: {
+    transform: 'rotate(45deg)',
   },
   modalOverlay: {
     position: 'fixed',

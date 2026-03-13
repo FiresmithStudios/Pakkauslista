@@ -1,0 +1,22 @@
+{
+  "name": "pakkauslista-db-manager",
+  "version": "1.0.0",
+  "description": "CLI database manager for Pakkauslista warehouse app",
+  "type": "module",
+  "main": "index.js",
+  "bin": {
+    "db-manager": "./index.js"
+  },
+  "scripts": {
+    "start": "node index.js",
+    "users": "node index.js users",
+    "read": "node index.js read",
+    "export": "node index.js export",
+    "tree": "node index.js tree"
+  },
+  "dependencies": {
+    "firebase": "^11.0.0",
+    "dotenv": "^16.4.5",
+    "chalk": "^5.3.0"
+  }
+}

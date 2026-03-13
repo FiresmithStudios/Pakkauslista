@@ -1,6 +1,7 @@
 import { Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider } from './AuthContext';
 import ProtectedRoute from './components/ProtectedRoute';
+import AppLayout from './components/AppLayout';
 import PinLoginScreen from './pages/PinLoginScreen';
 import ContainerSelectionScreen from './pages/ContainerSelectionScreen';
 import ContainerDetailScreen from './pages/ContainerDetailScreen';
@@ -14,45 +15,18 @@ function App() {
       <Routes>
         <Route path="/login" element={<PinLoginScreen />} />
         <Route
-          path="/containers"
           element={
             <ProtectedRoute>
-              <ContainerSelectionScreen />
+              <AppLayout />
             </ProtectedRoute>
           }
-        />
-        <Route
-          path="/containers/:containerId"
-          element={
-            <ProtectedRoute>
-              <ContainerDetailScreen />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/containers/:containerId/positions/:positionId"
-          element={
-            <ProtectedRoute>
-              <PositionDetailScreen />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/ai-search"
-          element={
-            <ProtectedRoute>
-              <AiSearchScreen />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/settings"
-          element={
-            <ProtectedRoute>
-              <SettingsScreen />
-            </ProtectedRoute>
-          }
-        />
+        >
+          <Route path="/containers" element={<ContainerSelectionScreen />} />
+          <Route path="/containers/:containerId" element={<ContainerDetailScreen />} />
+          <Route path="/containers/:containerId/positions/:positionId" element={<PositionDetailScreen />} />
+          <Route path="/ai-search" element={<AiSearchScreen />} />
+          <Route path="/settings" element={<SettingsScreen />} />
+        </Route>
         <Route path="/" element={<Navigate to="/containers" replace />} />
         <Route path="*" element={<Navigate to="/containers" replace />} />
       </Routes>

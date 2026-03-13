@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../AuthContext';
+import { IconBack, IconSearch } from '../components/Icons';
 import { positionsApi } from '../api';
 import { preprocessForOcr } from '../ocr-utils';
 import type { PositionWithContainer } from '../store';
@@ -172,9 +173,13 @@ export default function AiSearchScreen() {
     <div style={styles.container}>
       <header style={styles.header}>
         <button style={styles.backButton} onClick={() => navigate('/containers')}>
-          ← Takaisin
+          <IconBack />
+          <span>Takaisin</span>
         </button>
-        <h1 style={styles.title}>AI-tuotehaku</h1>
+        <div style={styles.titleRow}>
+          <IconSearch />
+          <h1 style={styles.title}>AI-tuotehaku</h1>
+        </div>
         <p style={styles.subtitle}>
           Ota kuva tuotteen etiketistä – AI tunnistaa oikean position
         </p>
@@ -296,12 +301,20 @@ const styles: Record<string, React.CSSProperties> = {
     marginBottom: 24,
   },
   backButton: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: 8,
     background: 'none',
     color: 'var(--color-accent)',
     fontWeight: 500,
     marginBottom: 8,
     padding: 8,
     fontSize: '1rem',
+  },
+  titleRow: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: 12,
   },
   title: {
     margin: 0,

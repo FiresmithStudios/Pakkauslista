@@ -2,9 +2,10 @@ import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../AuthContext';
 import { useDisplayName } from '../hooks/useDisplayName';
-import { containersApi, exportDataAsync, subscribeToContainers } from '../api';
+import { containersApi, subscribeToContainers } from '../api';
 import type { Container } from '../types';
 import ConfirmModal from '../components/ConfirmModal';
+import { IconFilter, IconBox, IconEdit, IconTrash, IconMore } from '../components/Icons';
 
 export default function ContainerSelectionScreen() {
   const { user } = useAuth();
@@ -21,6 +22,7 @@ export default function ContainerSelectionScreen() {
   const [nameFilter, setNameFilter] = useState('');
   const [dateFilterFrom, setDateFilterFrom] = useState('');
   const [dateFilterTo, setDateFilterTo] = useState('');
+  const [filterPopupOpen, setFilterPopupOpen] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
 
   const filteredContainers = containers.filter((c) => {
@@ -129,48 +131,18 @@ export default function ContainerSelectionScreen() {
 
   if (!user) return null;
 
+  const hasActiveFilters = nameFilter.trim() || dateFilterFrom || dateFilterTo;
+
   return (
     <div style={styles.container}>
       <header style={styles.header}>
         <div style={styles.headerRow}>
-          <div>
-            <h1 style={styles.title}>Kontit</h1>
-            <p style={styles.operator}>Käyttäjä: {displayName || user.name}</p>
-          </div>
-          <div style={styles.headerButtons}>
-            <button
-              type="button"
-              onClick={() => navigate('/ai-search')}
-              style={styles.aiSearchBtn}
-              title="AI-tuotehaku etiketin kuvalla"
-            >
-              AI-haku
-            </button>
-            <button
-              type="button"
-              onClick={() => navigate('/settings')}
-              style={styles.exportBtn}
-              title="Asetukset"
-            >
-              Asetukset
-            </button>
-            <button
-            type="button"
-            onClick={async () => {
-              const json = await exportDataAsync();
-              const blob = new Blob([json], { type: 'application/json' });
-              const url = URL.createObjectURL(blob);
-              const a = document.createElement('a');
-              a.href = url;
-              a.download = `warehouse-backup-${new Date().toISOString().slice(0, 10)}.json`;
-              a.click();
-              URL.revokeObjectURL(url);
-            }}
-            style={styles.exportBtn}
-            title="Lataa tietokanta JSON-tiedostona"
-          >
-            Lataa varmuuskopio
-            </button>
+          <div style={styles.titleRow}>
+            <IconBox />
+            <div>
+              <h1 style={styles.title}>Kontit</h1>
+              <p style={styles.operator}>{displayName || user.name}</p>
+            </div>
           </div>
         </div>
       </header>
@@ -185,37 +157,49 @@ export default function ContainerSelectionScreen() {
           style={styles.input}
         />
         <button type="submit" style={styles.button} disabled={!newNumber.trim()}>
-          Avaa / Luo
+          +
         </button>
       </form>
 
       {error && <p style={styles.error}>{error}</p>}
 
       <section style={styles.section}>
-        <h2 style={styles.sectionTitle}>Avoimet kontit</h2>
-        <div style={styles.filterRow}>
-          <input
-            type="text"
-            value={nameFilter}
-            onChange={(e) => setNameFilter(e.target.value)}
-            placeholder="Suodata nimellä..."
-            style={styles.filterInput}
-          />
-          <input
-            type="date"
-            value={dateFilterFrom}
-            onChange={(e) => setDateFilterFrom(e.target.value)}
-            style={styles.filterDate}
-            title="Luontipäivä alkaen"
-          />
-          <input
-            type="date"
-            value={dateFilterTo}
-            onChange={(e) => setDateFilterTo(e.target.value)}
-            style={styles.filterDate}
-            title="Luontipäivä päättyen"
-          />
+        <div style={styles.sectionHeader}>
+          <h2 style={styles.sectionTitle}>Avoimet kontit</h2>
+          <button
+            type="button"
+            style={{ ...styles.filterBtn, ...(hasActiveFilters ? styles.filterBtnActive : {}) }}
+            onClick={() => setFilterPopupOpen(!filterPopupOpen)}
+            title="Suodata"
+          >
+            <IconFilter />
+          </button>
         </div>
+        {filterPopupOpen && (
+          <div style={styles.filterPopup}>
+            <input
+              type="text"
+              value={nameFilter}
+              onChange={(e) => setNameFilter(e.target.value)}
+              placeholder="Nimellä..."
+              style={styles.filterInput}
+            />
+            <input
+              type="date"
+              value={dateFilterFrom}
+              onChange={(e) => setDateFilterFrom(e.target.value)}
+              style={styles.filterDate}
+              title="Alkaen"
+            />
+            <input
+              type="date"
+              value={dateFilterTo}
+              onChange={(e) => setDateFilterTo(e.target.value)}
+              style={styles.filterDate}
+              title="Päättyen"
+            />
+          </div>
+        )}
         {loading ? (
           <p style={styles.muted}>Ladataan...</p>
         ) : containers.length === 0 ? (
@@ -230,6 +214,7 @@ export default function ContainerSelectionScreen() {
                   style={styles.card}
                   onClick={() => handleSelectContainer(c)}
                 >
+                  <IconBox />
                   <span style={styles.cardNumber}>{c.containerNumber}</span>
                   <button
                     style={styles.menuBtn}
@@ -239,19 +224,21 @@ export default function ContainerSelectionScreen() {
                     }}
                     aria-label="Valikko"
                   >
-                    ⋮
+                    <IconMore />
                   </button>
                 </button>
                 {menuOpen === c.id && (
                   <div style={styles.menu}>
                     <button style={styles.menuItem} onClick={() => { setEditModal(c); setMenuOpen(null); }}>
-                      Muokkaa
+                      <IconEdit />
+                      <span>Muokkaa</span>
                     </button>
                     <button style={styles.menuItem} onClick={() => handleCloseContainer(c)}>
                       Sulje kontti
                     </button>
                     <button style={styles.menuItemDanger} onClick={() => { setDeleteModal(c); setMenuOpen(null); }}>
-                      Poista
+                      <IconTrash />
+                      <span>Poista</span>
                     </button>
                   </div>
                 )}
@@ -313,45 +300,13 @@ const styles: Record<string, React.CSSProperties> = {
   },
   headerRow: {
     display: 'flex',
-    justifyContent: 'space-between',
     alignItems: 'flex-start',
     gap: 16,
   },
-  headerButtons: {
+  titleRow: {
     display: 'flex',
-    gap: 8,
-    flexWrap: 'wrap',
-  },
-  aiSetupBtn: {
-    padding: '10px 16px',
-    fontSize: '0.9rem',
-    fontWeight: 500,
-    background: 'var(--color-accent)',
-    color: 'var(--color-bg)',
-    borderRadius: 'var(--radius-sm)',
-    whiteSpace: 'nowrap',
-    cursor: 'pointer',
-  },
-  aiSearchBtn: {
-    padding: '10px 16px',
-    fontSize: '0.9rem',
-    fontWeight: 500,
-    background: 'var(--color-accent)',
-    color: 'var(--color-bg)',
-    borderRadius: 'var(--radius-sm)',
-    whiteSpace: 'nowrap',
-    cursor: 'pointer',
-  },
-  exportBtn: {
-    padding: '10px 16px',
-    fontSize: '0.9rem',
-    fontWeight: 500,
-    background: 'var(--color-surface)',
-    color: 'var(--color-accent)',
-    borderRadius: 'var(--radius-sm)',
-    border: '2px solid var(--color-surface-hover)',
-    whiteSpace: 'nowrap',
-    cursor: 'pointer',
+    alignItems: 'center',
+    gap: 12,
   },
   title: {
     margin: 0,
@@ -394,17 +349,37 @@ const styles: Record<string, React.CSSProperties> = {
   section: {
     marginTop: 24,
   },
+  sectionHeader: {
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 12,
+    gap: 8,
+  },
   sectionTitle: {
-    margin: '0 0 12px',
+    margin: 0,
     fontSize: '1rem',
     fontWeight: 600,
     color: 'var(--color-text-muted)',
   },
-  filterRow: {
+  filterBtn: {
+    padding: 8,
+    background: 'var(--color-surface)',
+    color: 'var(--color-text-muted)',
+    borderRadius: 'var(--radius-sm)',
+  },
+  filterBtnActive: {
+    color: 'var(--color-accent)',
+    background: 'var(--color-surface-hover)',
+  },
+  filterPopup: {
     display: 'flex',
     gap: 8,
     marginBottom: 12,
     flexWrap: 'wrap',
+    padding: 12,
+    background: 'var(--color-surface)',
+    borderRadius: 'var(--radius-sm)',
   },
   filterInput: {
     flex: 1,
@@ -446,6 +421,7 @@ const styles: Record<string, React.CSSProperties> = {
     minHeight: 56,
     display: 'flex',
     alignItems: 'center',
+    gap: 12,
   },
   cardNumber: {
     flex: 1,
@@ -469,7 +445,9 @@ const styles: Record<string, React.CSSProperties> = {
     zIndex: 10,
   },
   menuItem: {
-    display: 'block',
+    display: 'flex',
+    alignItems: 'center',
+    gap: 10,
     width: '100%',
     padding: '12px 20px',
     textAlign: 'left',
@@ -478,7 +456,9 @@ const styles: Record<string, React.CSSProperties> = {
     fontSize: '1rem',
   },
   menuItemDanger: {
-    display: 'block',
+    display: 'flex',
+    alignItems: 'center',
+    gap: 10,
     width: '100%',
     padding: '12px 20px',
     textAlign: 'left',

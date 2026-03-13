@@ -7,6 +7,7 @@ import type { Position, PositionTransaction } from '../types';
 import ProgressBar from '../components/ProgressBar';
 import TransactionOverlay from '../components/TransactionOverlay';
 import ConfirmModal from '../components/ConfirmModal';
+import { IconBack, IconEdit, IconTrash } from '../components/Icons';
 
 export default function PositionDetailScreen() {
   const { containerId, positionId } = useParams<{ containerId: string; positionId: string }>();
@@ -155,7 +156,8 @@ export default function PositionDetailScreen() {
     <div style={styles.container}>
       <header style={styles.header}>
         <button style={styles.backButton} onClick={() => navigate(`/containers/${containerId}`)}>
-          ← Takaisin
+          <IconBack />
+          <span>Takaisin</span>
         </button>
       </header>
 
@@ -234,10 +236,12 @@ export default function PositionDetailScreen() {
 
             <div style={styles.actionRow}>
               <button style={styles.editBtn} onClick={() => setShowEditModal(true)}>
-                Muokkaa
+                <IconEdit />
+                <span>Muokkaa</span>
               </button>
               <button style={styles.deleteBtn} onClick={() => setShowDeleteModal(true)}>
-                Poista positio
+                <IconTrash />
+                <span>Poista</span>
               </button>
             </div>
 
@@ -355,6 +359,9 @@ const styles: Record<string, React.CSSProperties> = {
     marginBottom: 24,
   },
   backButton: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: 8,
     background: 'none',
     color: 'var(--color-accent)',
     fontWeight: 500,
@@ -531,6 +538,9 @@ const styles: Record<string, React.CSSProperties> = {
     fontSize: '0.85rem',
   },
   editBtn: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: 8,
     padding: '12px 20px',
     background: 'var(--color-surface)',
     color: 'var(--color-accent)',
@@ -539,6 +549,9 @@ const styles: Record<string, React.CSSProperties> = {
     border: '2px solid var(--color-surface-hover)',
   },
   deleteBtn: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: 8,
     padding: '12px 20px',
     background: 'transparent',
     color: '#f87171',

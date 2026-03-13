@@ -19,15 +19,18 @@ interface AuthContextValue {
   loading: boolean;
   logout: () => void;
   setUser: (user: User | null) => void;
+  refreshUser: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null);
 
 function applyTheme(appearance: string | undefined) {
-  if (appearance === 'system' || !appearance) {
-    delete document.documentElement.dataset.theme;
-  } else {
+  if (appearance === 'system') {
+    document.documentElement.dataset.theme = 'system';
+  } else if (appearance === 'light' || appearance === 'dark') {
     document.documentElement.dataset.theme = appearance;
+  } else {
+    document.documentElement.dataset.theme = 'dark';
   }
 }
 
@@ -72,9 +75,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setUserState(u);
   }, []);
 
+  const refreshUser = useCallback(async () => {
+    const uuid = getStoredSessionUuid();
+    if (!uuid) return;
+    const fresh = await getUserByUuid(uuid);
+    setUserState(fresh);
+  }, []);
+
   const value = useMemo(
-    () => ({ user, loading, logout, setUser }),
-    [user, loading, logout, setUser]
+    () => ({ user, loading, logout, setUser, refreshUser }),
+    [user, loading, logout, setUser, refreshUser]
   );
 
   return (

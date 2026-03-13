@@ -1,11 +1,16 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../AuthContext';
 import { getSettings, updateSettings } from '../services/settingsService';
+import { getAllUsedPins, generateRandomUnusedPin, updateUserPin } from '../services/usersService';
+import ConfirmModal from '../components/ConfirmModal';
+import { IconBack, IconSettings, IconKey } from '../components/Icons';
 import type { UserSettings } from '../types';
 
+const HOLD_DURATION_MS = 600;
+
 export default function SettingsScreen() {
-  const { user, logout } = useAuth();
+  const { user, logout, refreshUser } = useAuth();
   const navigate = useNavigate();
   const [, setSettings] = useState<UserSettings>({});
   const [loading, setLoading] = useState(true);
@@ -15,6 +20,10 @@ export default function SettingsScreen() {
     displayName: '',
     appearance: 'dark',
   });
+  const [showPin, setShowPin] = useState(false);
+  const [newPinModal, setNewPinModal] = useState(false);
+  const [generatedPin, setGeneratedPin] = useState<string | null>(null);
+  const holdTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     if (!user) return;
@@ -43,9 +52,11 @@ export default function SettingsScreen() {
       setSettings(updated);
       const appearance = form.appearance;
       if (appearance === 'system') {
-        delete document.documentElement.dataset.theme;
-      } else {
+        document.documentElement.dataset.theme = 'system';
+      } else if (appearance === 'light' || appearance === 'dark') {
         document.documentElement.dataset.theme = appearance;
+      } else {
+        document.documentElement.dataset.theme = 'dark';
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Tallennus epäonnistui');
@@ -54,15 +65,54 @@ export default function SettingsScreen() {
     }
   };
 
+  const handleGetNewPin = async () => {
+    if (!user) return;
+    setNewPinModal(true);
+  };
+
+  const confirmGetNewPin = async () => {
+    if (!user) return;
+    setError(null);
+    try {
+      const usedPins = await getAllUsedPins(user.uuid);
+      const newPin = generateRandomUnusedPin(usedPins);
+      await updateUserPin(user.uuid, newPin);
+      await refreshUser();
+      setGeneratedPin(newPin);
+      setNewPinModal(false);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'PIN-vaihto epäonnistui');
+    }
+  };
+
+  const handleHoldStart = () => {
+    holdTimerRef.current = setTimeout(() => {
+      setShowPin(true);
+      holdTimerRef.current = null;
+    }, HOLD_DURATION_MS);
+  };
+
+  const handleHoldEnd = () => {
+    if (holdTimerRef.current) {
+      clearTimeout(holdTimerRef.current);
+      holdTimerRef.current = null;
+    }
+    setShowPin(false);
+  };
+
   if (!user) return null;
 
   return (
     <div style={styles.container}>
       <header style={styles.header}>
         <button style={styles.backButton} onClick={() => navigate(-1)}>
-          ← Takaisin
+          <IconBack />
+          <span>Takaisin</span>
         </button>
-        <h1 style={styles.title}>Asetukset</h1>
+        <div style={styles.titleRow}>
+          <IconSettings />
+          <h1 style={styles.title}>Asetukset</h1>
+        </div>
       </header>
 
       {loading ? (
@@ -78,7 +128,7 @@ export default function SettingsScreen() {
             placeholder={user.name}
           />
 
-          <label style={styles.label}>Käyttöliittymän teema</label>
+          <label style={styles.label}>Teema</label>
           <select
             value={form.appearance}
             onChange={(e) =>
@@ -91,8 +141,36 @@ export default function SettingsScreen() {
           >
             <option value="dark">Tumma</option>
             <option value="light">Vaalea</option>
-            <option value="system">Järjestelmän mukainen</option>
+            <option value="system">Järjestelmä</option>
           </select>
+
+          <div style={styles.pinSection}>
+            <label style={styles.label}>PIN-koodi</label>
+            <button
+              type="button"
+              style={styles.checkPinBtn}
+              onPointerDown={handleHoldStart}
+              onPointerUp={handleHoldEnd}
+              onPointerLeave={handleHoldEnd}
+              onContextMenu={(e) => e.preventDefault()}
+            >
+              <IconKey />
+              <span>{showPin ? user.pin : 'Pidä painettuna nähdäksesi PIN'}</span>
+            </button>
+            <button
+              type="button"
+              style={styles.newPinBtn}
+              onClick={handleGetNewPin}
+            >
+              Hae uusi PIN
+            </button>
+          </div>
+
+          {generatedPin && (
+            <p style={styles.generatedPin}>
+              Uusi PIN: <strong>{generatedPin}</strong> — kirjaudu uudelleen muistaaksesi
+            </p>
+          )}
 
           {error && <p style={styles.error}>{error}</p>}
 
@@ -112,6 +190,16 @@ export default function SettingsScreen() {
           </button>
         </form>
       )}
+
+      {newPinModal && (
+        <ConfirmModal
+          title="Hae uusi PIN"
+          message="Vanha PIN poistuu. Saat satunnaisen käyttämättömän 4-numeroisen PIN-koodin. Haluatko jatkaa?"
+          confirmLabel="Hae uusi PIN"
+          onConfirm={confirmGetNewPin}
+          onCancel={() => setNewPinModal(false)}
+        />
+      )}
     </div>
   );
 }
@@ -125,12 +213,20 @@ const styles: Record<string, React.CSSProperties> = {
     marginBottom: 24,
   },
   backButton: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: 8,
     background: 'none',
     color: 'var(--color-accent)',
     fontWeight: 500,
     marginBottom: 8,
     padding: 8,
     fontSize: '1rem',
+  },
+  titleRow: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: 12,
   },
   title: {
     margin: 0,
@@ -168,6 +264,36 @@ const styles: Record<string, React.CSSProperties> = {
     background: 'var(--color-bg)',
     color: 'var(--color-text)',
     outline: 'none',
+  },
+  pinSection: {
+    marginTop: 8,
+  },
+  checkPinBtn: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: 10,
+    width: '100%',
+    padding: '14px 16px',
+    marginBottom: 8,
+    background: 'var(--color-surface)',
+    color: 'var(--color-text-muted)',
+    borderRadius: 'var(--radius-sm)',
+    border: '2px solid var(--color-surface-hover)',
+    fontSize: '0.95rem',
+  },
+  newPinBtn: {
+    padding: '12px 20px',
+    background: 'var(--color-surface-hover)',
+    color: 'var(--color-text)',
+    borderRadius: 'var(--radius-sm)',
+    fontSize: '0.95rem',
+  },
+  generatedPin: {
+    padding: 12,
+    background: 'var(--color-surface)',
+    borderRadius: 'var(--radius-sm)',
+    fontSize: '0.95rem',
+    color: 'var(--color-success)',
   },
   button: {
     padding: '16px 24px',
