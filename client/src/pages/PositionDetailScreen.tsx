@@ -63,10 +63,38 @@ export default function PositionDetailScreen() {
     }
   }, [position, showEditModal]);
 
-  const { setTitle } = useTopBar();
+  const { setTitle, setMenuItems, clearMenuItems } = useTopBar();
   useEffect(() => {
     setTitle(position ? `#${position.positionNumber} ${position.name}` : '...');
   }, [setTitle, position]);
+
+  useEffect(() => {
+    if (!position) {
+      clearMenuItems();
+      return;
+    }
+    setMenuItems([
+      {
+        id: 'toggle-history',
+        label: eventHistoryExpanded ? 'Piilota historia' : 'Näytä historia',
+        onClick: () => setEventHistoryExpanded((v) => !v),
+      },
+      {
+        id: 'edit-position',
+        label: 'Muokkaa positiota',
+        icon: <IconEdit />,
+        onClick: () => setShowEditModal(true),
+      },
+      {
+        id: 'remove-position',
+        label: 'Poista positio',
+        icon: <IconTrash />,
+        danger: true,
+        onClick: () => setShowDeleteModal(true),
+      },
+    ]);
+    return () => clearMenuItems();
+  }, [position, eventHistoryExpanded, setMenuItems, clearMenuItems]);
 
   const handleAdjust = async (direction: number, amount?: number) => {
     if (!positionId || !user || direction === 0) return;
@@ -233,27 +261,11 @@ export default function PositionDetailScreen() {
               </div>
             )}
 
-            <div style={styles.actionRow}>
-              <button style={styles.editBtn} onClick={() => setShowEditModal(true)}>
-                <IconEdit />
-                <span>Muokkaa</span>
-              </button>
-              <button style={styles.deleteBtn} onClick={() => setShowDeleteModal(true)}>
-                <IconTrash />
-                <span>Poista</span>
-              </button>
-            </div>
-
-            <div style={styles.eventHistorySection}>
-              <button
-                style={styles.eventHistoryHeader}
-                onClick={() => setEventHistoryExpanded(!eventHistoryExpanded)}
-                aria-expanded={eventHistoryExpanded}
-              >
-                <span>Tapahtumahistoria ({transactions.length})</span>
-                <span style={styles.expandIcon}>{eventHistoryExpanded ? '▼' : '▶'}</span>
-              </button>
-              {eventHistoryExpanded && (
+            {eventHistoryExpanded && (
+              <div style={styles.eventHistorySection}>
+                <div style={styles.eventHistoryHeader}>
+                  <span>Tapahtumahistoria ({transactions.length})</span>
+                </div>
                 <div style={styles.eventHistoryList}>
                   {transactions.length === 0 ? (
                     <p style={styles.eventHistoryEmpty}>Ei tapahtumia</p>
@@ -271,8 +283,8 @@ export default function PositionDetailScreen() {
                     ))
                   )}
                 </div>
-              )}
-            </div>
+              </div>
+            )}
           </div>
 
           <div style={styles.overlayWrapper}>

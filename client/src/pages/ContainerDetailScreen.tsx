@@ -10,7 +10,7 @@ import ConfirmModal from '../components/ConfirmModal';
 import AddPositionWithAiModal from '../components/AddPositionWithAiModal';
 import { logEvent } from '../services/eventsService';
 import { useTopBar } from '../contexts/TopBarContext';
-import { IconPlus, IconSparkles, IconEdit, IconTrash, IconMore } from '../components/Icons';
+import { IconPlus, IconSparkles, IconEdit, IconTrash } from '../components/Icons';
 
 export default function ContainerDetailScreen() {
   const { containerId } = useParams<{ containerId: string }>();
@@ -22,9 +22,7 @@ export default function ContainerDetailScreen() {
   const [error, setError] = useState<string | null>(null);
   const [showAddModal, setShowAddModal] = useState(false);
   const [showAiAddModal, setShowAiAddModal] = useState(false);
-  const [fabExpanded, setFabExpanded] = useState(false);
   const [addForm, setAddForm] = useState({ positionNumber: '', name: '', totalQuantity: '', notes: '' });
-  const [containerMenuOpen, setContainerMenuOpen] = useState(false);
   const [editContainerModal, setEditContainerModal] = useState(false);
   const [editContainerValue, setEditContainerValue] = useState('');
   const [deleteContainerModal, setDeleteContainerModal] = useState(false);
@@ -61,10 +59,50 @@ export default function ContainerDetailScreen() {
     if (editContainerModal && container) setEditContainerValue(container.containerNumber);
   }, [editContainerModal, container]);
 
-  const { setTitle } = useTopBar();
+  const { setTitle, setMenuItems, clearMenuItems } = useTopBar();
   useEffect(() => {
     setTitle(container?.containerNumber ?? '...');
   }, [setTitle, container?.containerNumber]);
+
+  useEffect(() => {
+    if (!container || container.isClosed) {
+      clearMenuItems();
+      return;
+    }
+    setMenuItems([
+      {
+        id: 'add-position-manual',
+        label: 'Lisää positio',
+        icon: <IconPlus />,
+        onClick: () => setShowAddModal(true),
+      },
+      {
+        id: 'add-position-ai',
+        label: 'Lisää positio AI:lla',
+        icon: <IconSparkles />,
+        onClick: () => setShowAiAddModal(true),
+      },
+      {
+        id: 'edit-container',
+        label: 'Muokkaa konttia',
+        icon: <IconEdit />,
+        onClick: () => setEditContainerModal(true),
+      },
+      {
+        id: 'close-container',
+        label: 'Sulje kontti',
+        onClick: handleCloseContainer,
+      },
+      {
+        id: 'delete-container',
+        label: 'Poista kontti',
+        icon: <IconTrash />,
+        danger: true,
+        onClick: () => setDeleteContainerModal(true),
+      },
+    ]);
+    return () => clearMenuItems();
+  }, [container, setMenuItems, clearMenuItems]);
 
   const handleEditContainer = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -85,7 +123,6 @@ export default function ContainerDetailScreen() {
     try {
       await containersApi.close(containerId);
       setContainer((c) => c ? { ...c, isClosed: true } : null);
-      setContainerMenuOpen(false);
       navigate('/containers');
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Virhe');
@@ -166,33 +203,6 @@ export default function ContainerDetailScreen() {
 
   return (
     <div style={styles.container}>
-      {container && !container.isClosed && (
-        <div style={styles.containerMenuWrap} aria-hidden>
-          <button
-            style={styles.menuBtn}
-            onClick={() => setContainerMenuOpen(!containerMenuOpen)}
-            aria-label="Kontin valikko"
-          >
-            <IconMore />
-          </button>
-          {containerMenuOpen && (
-            <div style={styles.headerMenu}>
-              <button style={styles.menuItem} onClick={() => { setEditContainerModal(true); setContainerMenuOpen(false); }}>
-                <IconEdit />
-                <span>Muokkaa konttia</span>
-              </button>
-              <button style={styles.menuItem} onClick={handleCloseContainer}>
-                Sulje kontti
-              </button>
-              <button style={styles.menuItemDanger} onClick={() => { setDeleteContainerModal(true); setContainerMenuOpen(false); }}>
-                <IconTrash />
-                <span>Poista kontti</span>
-              </button>
-            </div>
-          )}
-        </div>
-      )}
-
       {error && <p style={styles.error}>{error}</p>}
 
       {positions.length > 0 && !loading && (
@@ -231,34 +241,6 @@ export default function ContainerDetailScreen() {
           ))}
         </div>
       )}
-
-      <div style={styles.fabWrap}>
-        {fabExpanded && (
-          <div style={styles.fabMenu}>
-            <button
-              style={styles.fabOption}
-              onClick={() => { setShowAiAddModal(true); setFabExpanded(false); }}
-            >
-              <IconSparkles />
-              <span>AI</span>
-            </button>
-            <button
-              style={styles.fabOption}
-              onClick={() => { setShowAddModal(true); setFabExpanded(false); }}
-            >
-              <IconPlus />
-              <span>Manuaalinen</span>
-            </button>
-          </div>
-        )}
-        <button
-          style={{ ...styles.fab, ...(fabExpanded ? styles.fabRotate : {}) }}
-          onClick={() => setFabExpanded(!fabExpanded)}
-          aria-label="Lisää positio"
-        >
-          <IconPlus />
-        </button>
-      </div>
 
       {showAddModal && (
         <div style={styles.modalOverlay} onClick={() => setShowAddModal(false)}>
@@ -379,53 +361,6 @@ const styles: Record<string, React.CSSProperties> = {
     paddingBottom: 100,
     position: 'relative',
   },
-  containerMenuWrap: {
-    position: 'absolute',
-    top: 0,
-    right: 0,
-    zIndex: 10,
-  },
-  menuBtn: {
-    padding: '8px 12px',
-    background: 'none',
-    color: 'var(--color-text-muted)',
-    fontSize: '1.25rem',
-    lineHeight: 1,
-  },
-  headerMenu: {
-    position: 'absolute',
-    top: '100%',
-    right: 0,
-    marginTop: 4,
-    minWidth: 180,
-    background: 'var(--color-surface)',
-    borderRadius: 'var(--radius-sm)',
-    boxShadow: 'var(--shadow)',
-    overflow: 'hidden',
-    zIndex: 10,
-  },
-  menuItem: {
-    display: 'flex',
-    alignItems: 'center',
-    gap: 10,
-    width: '100%',
-    padding: '12px 20px',
-    textAlign: 'left',
-    background: 'none',
-    color: 'var(--color-text)',
-    fontSize: '1rem',
-  },
-  menuItemDanger: {
-    display: 'flex',
-    alignItems: 'center',
-    gap: 10,
-    width: '100%',
-    padding: '12px 20px',
-    textAlign: 'left',
-    background: 'none',
-    color: '#f87171',
-    fontSize: '1rem',
-  },
   error: {
     color: '#f87171',
     margin: '0 0 16px',
@@ -465,47 +400,6 @@ const styles: Record<string, React.CSSProperties> = {
     display: 'flex',
     flexDirection: 'column',
     gap: 12,
-  },
-  fabWrap: {
-    position: 'fixed',
-    bottom: 24,
-    right: 24,
-    display: 'flex',
-    flexDirection: 'column',
-    alignItems: 'flex-end',
-    gap: 12,
-  },
-  fabMenu: {
-    display: 'flex',
-    flexDirection: 'column',
-    gap: 8,
-    marginBottom: 4,
-  },
-  fabOption: {
-    display: 'flex',
-    alignItems: 'center',
-    gap: 10,
-    padding: '12px 20px',
-    background: 'var(--color-surface)',
-    color: 'var(--color-text)',
-    borderRadius: 'var(--radius-sm)',
-    boxShadow: 'var(--shadow)',
-    border: '2px solid var(--color-surface-hover)',
-    fontSize: '0.95rem',
-  },
-  fab: {
-    width: 56,
-    height: 56,
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    background: 'var(--color-accent)',
-    color: 'var(--color-bg)',
-    borderRadius: '50%',
-    boxShadow: 'var(--shadow)',
-  },
-  fabRotate: {
-    transform: 'rotate(45deg)',
   },
   modalOverlay: {
     position: 'fixed',

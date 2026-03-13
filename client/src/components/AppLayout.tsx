@@ -3,13 +3,22 @@ import { Outlet, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../AuthContext';
 import { useDisplayName } from '../hooks/useDisplayName';
 import { exportDataAsync } from '../api';
-import { TopBarProvider } from '../contexts/TopBarContext';
+import { TopBarProvider, useTopBar } from '../contexts/TopBarContext';
 import TopBar from './TopBar';
 import { IconSettings, IconSearch, IconDownload, IconBox, IconClose } from './Icons';
 
 export default function AppLayout() {
+  return (
+    <TopBarProvider>
+      <AppLayoutContent />
+    </TopBarProvider>
+  );
+}
+
+function AppLayoutContent() {
   const { user } = useAuth();
   const displayName = useDisplayName();
+  const { menuItems } = useTopBar();
   const navigate = useNavigate();
   const location = useLocation();
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -38,59 +47,80 @@ export default function AppLayout() {
     }
   };
 
-  return (
-    <TopBarProvider>
-      <div style={styles.wrapper}>
-        <TopBar onMenuClick={() => setSidebarOpen(true)} />
+  const hasContextMenu = menuItems.length > 0;
 
-        {sidebarOpen && (
-          <>
-            <div
-              style={styles.overlay}
-              onClick={closeSidebar}
-              aria-hidden
-            />
-            <aside style={styles.sidebar}>
-              <div style={styles.sidebarHeader}>
-                <span style={styles.sidebarTitle}>Valikko</span>
-                <button style={styles.closeBtn} onClick={closeSidebar} aria-label="Sulje">
-                  <IconClose />
-                </button>
-              </div>
-              <p style={styles.userInfo}>
-                {displayName || user?.name}
-              </p>
-              <nav style={styles.nav}>
-                {navItems.map(({ path, label, icon: Icon }) => (
+  return (
+    <div style={styles.wrapper}>
+      <TopBar onMenuClick={() => setSidebarOpen(true)} />
+
+      {sidebarOpen && (
+        <>
+          <div
+            style={styles.overlay}
+            onClick={closeSidebar}
+            aria-hidden
+          />
+          <aside style={styles.sidebar}>
+            <div style={styles.sidebarHeader}>
+              <span style={styles.sidebarTitle}>Valikko</span>
+              <button style={styles.closeBtn} onClick={closeSidebar} aria-label="Sulje">
+                <IconClose />
+              </button>
+            </div>
+            <p style={styles.userInfo}>
+              {displayName || user?.name}
+            </p>
+            <nav style={styles.nav}>
+              {hasContextMenu ? (
+                menuItems.map((item) => (
                   <button
-                    key={path}
+                    key={item.id}
                     style={{
                       ...styles.navItem,
-                      ...(location.pathname.startsWith(path) ? styles.navItemActive : {}),
+                      ...(item.danger ? styles.navItemDanger : {}),
                     }}
                     onClick={() => {
-                      navigate(path);
+                      item.onClick();
                       closeSidebar();
                     }}
                   >
-                    <Icon />
-                    <span>{label}</span>
+                    {item.icon}
+                    <span>{item.label}</span>
                   </button>
-                ))}
-                <button style={styles.navItem} onClick={handleExport}>
-                  <IconDownload />
-                  <span>Lataa varmuuskopio</span>
-                </button>
-              </nav>
-            </aside>
-          </>
-        )}
+                ))
+              ) : (
+                <>
+                  {navItems.map(({ path, label, icon: Icon }) => (
+                    <button
+                      key={path}
+                      style={{
+                        ...styles.navItem,
+                        ...(location.pathname.startsWith(path) ? styles.navItemActive : {}),
+                      }}
+                      onClick={() => {
+                        navigate(path);
+                        closeSidebar();
+                      }}
+                    >
+                      <Icon />
+                      <span>{label}</span>
+                    </button>
+                  ))}
+                  <button style={styles.navItem} onClick={handleExport}>
+                    <IconDownload />
+                    <span>Lataa varmuuskopio</span>
+                  </button>
+                </>
+              )}
+            </nav>
+          </aside>
+        </>
+      )}
 
-        <main style={styles.main}>
-          <Outlet />
-        </main>
-      </div>
-    </TopBarProvider>
+      <main style={styles.main}>
+        <Outlet />
+      </main>
+    </div>
   );
 }
 
@@ -170,6 +200,9 @@ const styles: Record<string, React.CSSProperties> = {
     background: 'var(--color-surface-hover)',
     color: 'var(--color-accent)',
     boxShadow: '0 6px 16px rgba(2, 6, 23, 0.14)',
+  },
+  navItemDanger: {
+    color: '#f87171',
   },
   main: {
     flex: 1,
