@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useOperator } from '../OperatorContext';
+import { useAuth } from '../AuthContext';
 import { positionsApi } from '../api';
 import { preprocessForOcr } from '../ocr-utils';
 import type { PositionWithContainer } from '../store';
@@ -14,7 +14,7 @@ interface AiSearchResult {
 }
 
 export default function AiSearchScreen() {
-  const { operatorName } = useOperator();
+  const { user } = useAuth();
   const navigate = useNavigate();
   const videoRef = useRef<HTMLVideoElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
@@ -29,11 +29,11 @@ export default function AiSearchScreen() {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!operatorName) {
-      navigate('/', { replace: true });
+    if (!user) {
+      navigate('/login', { replace: true });
       return;
     }
-  }, [operatorName, navigate]);
+  }, [user, navigate]);
 
   useEffect(() => {
     positionsApi.listAllWithContainers().then(setPositions).finally(() => setLoadingPositions(false));
@@ -162,7 +162,7 @@ export default function AiSearchScreen() {
     if (p) navigate(`/containers/${p.containerId}/positions/${p.id}`);
   };
 
-  if (!operatorName) return null;
+  if (!user) return null;
 
   const matchedPosition = result?.positionId
     ? positions.find((p) => p.id === result.positionId)

@@ -1,7 +1,8 @@
 import { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { useOperator } from '../OperatorContext';
+import { useAuth } from '../AuthContext';
 import { positionsApi, subscribeToPosition, subscribeToTransactions } from '../api';
+import { logEvent } from '../services/eventsService';
 import type { Position, PositionTransaction } from '../types';
 import ProgressBar from '../components/ProgressBar';
 import TransactionOverlay from '../components/TransactionOverlay';
@@ -10,7 +11,7 @@ import ConfirmModal from '../components/ConfirmModal';
 export default function PositionDetailScreen() {
   const { containerId, positionId } = useParams<{ containerId: string; positionId: string }>();
   const navigate = useNavigate();
-  const { operatorName } = useOperator();
+  const { user } = useAuth();
   const [position, setPosition] = useState<Position | null>(null);
   const [lastTransaction, setLastTransaction] = useState<PositionTransaction | null>(null);
   const [transactions, setTransactions] = useState<PositionTransaction[]>([]);
@@ -19,15 +20,16 @@ export default function PositionDetailScreen() {
   const [error, setError] = useState<string | null>(null);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
+  const [eventHistoryExpanded, setEventHistoryExpanded] = useState(false);
   const [editForm, setEditForm] = useState({ name: '', totalQuantity: '', notes: '' });
   const inputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
-    if (!operatorName) {
-      navigate('/', { replace: true });
+    if (!user) {
+      navigate('/login', { replace: true });
       return;
     }
-  }, [operatorName, navigate]);
+  }, [user, navigate]);
 
   useEffect(() => {
     if (!containerId || !positionId) return;
@@ -60,15 +62,21 @@ export default function PositionDetailScreen() {
   }, [position, showEditModal]);
 
   const handleAdjust = async (direction: number, amount?: number) => {
-    if (!positionId || !operatorName || direction === 0) return;
+    if (!positionId || !user || direction === 0) return;
     const num = amount ?? (parseInt(adjustValue, 10) || 1);
     const actualDelta = direction > 0 ? num : -num;
     setError(null);
     try {
-      const res = await positionsApi.adjust(positionId, actualDelta, operatorName);
+      const res = await positionsApi.adjust(positionId, actualDelta, user.name, user.uuid);
       setPosition(res.position);
       setLastTransaction(res.lastTransaction);
       setAdjustValue('');
+      await logEvent({
+        userUuid: user.uuid,
+        action: actualDelta > 0 ? 'ADD_QUANTITY' : 'SUBTRACT_QUANTITY',
+        positionId,
+        quantityChange: actualDelta,
+      });
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Virhe');
     }
@@ -96,6 +104,14 @@ export default function PositionDetailScreen() {
       });
       setPosition(updated);
       setShowEditModal(false);
+      if (user) {
+        await logEvent({
+          userUuid: user.uuid,
+          action: 'UPDATE_POSITION',
+          positionId,
+          containerId: position.containerId,
+        });
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Virhe');
     }
@@ -112,7 +128,7 @@ export default function PositionDetailScreen() {
     }
   };
 
-  if (!operatorName || !containerId || !positionId) return null;
+  if (!user || !containerId || !positionId) return null;
 
   const pct = position && position.totalQuantity > 0
     ? (position.packedQuantity / position.totalQuantity) * 100
@@ -223,6 +239,36 @@ export default function PositionDetailScreen() {
               <button style={styles.deleteBtn} onClick={() => setShowDeleteModal(true)}>
                 Poista positio
               </button>
+            </div>
+
+            <div style={styles.eventHistorySection}>
+              <button
+                style={styles.eventHistoryHeader}
+                onClick={() => setEventHistoryExpanded(!eventHistoryExpanded)}
+                aria-expanded={eventHistoryExpanded}
+              >
+                <span>Tapahtumahistoria ({transactions.length})</span>
+                <span style={styles.expandIcon}>{eventHistoryExpanded ? '▼' : '▶'}</span>
+              </button>
+              {eventHistoryExpanded && (
+                <div style={styles.eventHistoryList}>
+                  {transactions.length === 0 ? (
+                    <p style={styles.eventHistoryEmpty}>Ei tapahtumia</p>
+                  ) : (
+                    transactions.map((tx) => (
+                      <div key={tx.id} style={styles.eventHistoryItem}>
+                        <span style={styles.eventDelta}>
+                          {tx.delta >= 0 ? `+${tx.delta}` : tx.delta}
+                        </span>
+                        <span style={styles.eventUser}>{tx.operatorName}</span>
+                        <span style={styles.eventTime}>
+                          {new Date(tx.createdAt).toLocaleString('fi-FI')}
+                        </span>
+                      </div>
+                    ))
+                  )}
+                </div>
+              )}
             </div>
           </div>
 
@@ -431,6 +477,58 @@ const styles: Record<string, React.CSSProperties> = {
     display: 'flex',
     gap: 12,
     marginTop: 8,
+  },
+  eventHistorySection: {
+    marginTop: 24,
+    background: 'var(--color-surface)',
+    borderRadius: 'var(--radius-sm)',
+    overflow: 'hidden',
+  },
+  eventHistoryHeader: {
+    width: '100%',
+    padding: '12px 16px',
+    display: 'flex',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    background: 'none',
+    color: 'var(--color-text)',
+    fontSize: '0.95rem',
+    fontWeight: 600,
+  },
+  expandIcon: {
+    fontSize: '0.8rem',
+    color: 'var(--color-text-muted)',
+  },
+  eventHistoryList: {
+    padding: '0 16px 16px',
+    maxHeight: 200,
+    overflowY: 'auto',
+  },
+  eventHistoryEmpty: {
+    margin: 12,
+    color: 'var(--color-text-muted)',
+    fontSize: '0.9rem',
+  },
+  eventHistoryItem: {
+    display: 'flex',
+    gap: 12,
+    alignItems: 'center',
+    padding: '8px 0',
+    borderBottom: '1px solid var(--color-surface-hover)',
+    fontSize: '0.9rem',
+  },
+  eventDelta: {
+    fontWeight: 600,
+    color: 'var(--color-accent)',
+    minWidth: 40,
+  },
+  eventUser: {
+    flex: 1,
+    color: 'var(--color-text)',
+  },
+  eventTime: {
+    color: 'var(--color-text-muted)',
+    fontSize: '0.85rem',
   },
   editBtn: {
     padding: '12px 20px',

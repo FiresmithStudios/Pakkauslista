@@ -11,6 +11,14 @@
     "position_transactions": {
       ".read": true,
       ".write": true
+    },
+    "users": {
+      ".read": true,
+      ".write": true
+    },
+    "events": {
+      ".read": true,
+      ".write": true
     }
   }
 }

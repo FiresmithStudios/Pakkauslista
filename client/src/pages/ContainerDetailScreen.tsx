@@ -1,22 +1,25 @@
 import { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { useOperator } from '../OperatorContext';
+import { useAuth } from '../AuthContext';
 import { containersApi, positionsApi, subscribeToContainers, subscribeToPositions } from '../api';
 import type { Container, Position } from '../types';
 import PositionCard from '../components/PositionCard';
 import ProgressBar from '../components/ProgressBar';
 import EmptyState from '../components/EmptyState';
 import ConfirmModal from '../components/ConfirmModal';
+import AddPositionWithAiModal from '../components/AddPositionWithAiModal';
+import { logEvent } from '../services/eventsService';
 
 export default function ContainerDetailScreen() {
   const { containerId } = useParams<{ containerId: string }>();
   const navigate = useNavigate();
-  const { operatorName } = useOperator();
+  const { user } = useAuth();
   const [container, setContainer] = useState<Container | null>(null);
   const [positions, setPositions] = useState<Position[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [showAddModal, setShowAddModal] = useState(false);
+  const [showAiAddModal, setShowAiAddModal] = useState(false);
   const [addForm, setAddForm] = useState({ positionNumber: '', name: '', totalQuantity: '', notes: '' });
   const [containerMenuOpen, setContainerMenuOpen] = useState(false);
   const [editContainerModal, setEditContainerModal] = useState(false);
@@ -25,11 +28,11 @@ export default function ContainerDetailScreen() {
   const nameInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
-    if (!operatorName) {
-      navigate('/', { replace: true });
+    if (!user) {
+      navigate('/login', { replace: true });
       return;
     }
-  }, [operatorName, navigate]);
+  }, [user, navigate]);
 
   useEffect(() => {
     if (!containerId) return;
@@ -109,12 +112,49 @@ export default function ContainerDetailScreen() {
       });
       setAddForm({ positionNumber: '', name: '', totalQuantity: '', notes: '' });
       setShowAddModal(false);
+      if (user) {
+        await logEvent({
+          userUuid: user.uuid,
+          action: 'ADD_POSITION',
+          containerId,
+          metadata: { positionNumber: num, name: addForm.name.trim() },
+        });
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Virhe');
     }
   };
 
-  if (!operatorName || !containerId) return null;
+  const handleCreatePositionFromAi = async (data: {
+    positionNumber: number;
+    name: string;
+    totalQuantity: number;
+    notes?: string;
+  }) => {
+    if (!containerId) return;
+    await positionsApi.create({
+      containerId,
+      positionNumber: data.positionNumber,
+      name: data.name,
+      totalQuantity: data.totalQuantity,
+      notes: data.notes,
+    });
+    if (user) {
+      await logEvent({
+        userUuid: user.uuid,
+        action: 'ADD_POSITION',
+        containerId,
+        metadata: { positionNumber: data.positionNumber, name: data.name, source: 'ai' },
+      });
+    }
+  };
+
+  const nextPositionNumber =
+    positions.length > 0
+      ? Math.max(...positions.map((p) => p.positionNumber), 0) + 1
+      : 1;
+
+  if (!user || !containerId) return null;
 
   return (
     <div style={styles.container}>
@@ -190,9 +230,14 @@ export default function ContainerDetailScreen() {
         </div>
       )}
 
-      <button style={styles.fab} onClick={() => setShowAddModal(true)}>
-        + Lisää positio
-      </button>
+      <div style={styles.fabRow}>
+        <button style={styles.fabSecondary} onClick={() => setShowAiAddModal(true)}>
+          AI: Lisää positio
+        </button>
+        <button style={styles.fab} onClick={() => setShowAddModal(true)}>
+          + Lisää positio
+        </button>
+      </div>
 
       {showAddModal && (
         <div style={styles.modalOverlay} onClick={() => setShowAddModal(false)}>
@@ -280,6 +325,17 @@ export default function ContainerDetailScreen() {
             </form>
           </div>
         </div>
+      )}
+
+      {showAiAddModal && (
+        <AddPositionWithAiModal
+          nextPositionNumber={nextPositionNumber}
+          onSuccess={() => {
+            setShowAiAddModal(false);
+          }}
+          onCancel={() => setShowAiAddModal(false)}
+          onCreatePosition={handleCreatePositionFromAi}
+        />
       )}
 
       {deleteContainerModal && (
@@ -403,17 +459,33 @@ const styles: Record<string, React.CSSProperties> = {
     flexDirection: 'column',
     gap: 12,
   },
-  fab: {
+  fabRow: {
     position: 'fixed',
     bottom: 24,
     left: 24,
     right: 24,
+    display: 'flex',
+    gap: 12,
+  },
+  fab: {
+    flex: 1,
     padding: '18px 24px',
     fontSize: '1.125rem',
     fontWeight: 600,
     background: 'var(--color-accent)',
     color: 'var(--color-bg)',
     borderRadius: 'var(--radius-sm)',
+    boxShadow: 'var(--shadow)',
+  },
+  fabSecondary: {
+    flex: 1,
+    padding: '18px 24px',
+    fontSize: '1rem',
+    fontWeight: 600,
+    background: 'var(--color-surface)',
+    color: 'var(--color-accent)',
+    borderRadius: 'var(--radius-sm)',
+    border: '2px solid var(--color-accent)',
     boxShadow: 'var(--shadow)',
   },
   modalOverlay: {

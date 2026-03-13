@@ -317,7 +317,8 @@ export const positionsApi = {
   adjust: async (
     id: string,
     delta: number,
-    operatorName: string
+    operatorName: string,
+    userUuid?: string
   ): Promise<{ position: Position; lastTransaction: PositionTransaction | null }> => {
     const snap = await get(ref(db, `positions/${id}`));
     if (!snap.exists()) throw new Error('Position not found');
@@ -331,9 +332,10 @@ export const positionsApi = {
       positionId: id,
       delta,
       operatorName: operatorName.trim(),
+      userUuid: userUuid ?? undefined,
       createdAt: now(),
     };
-    await set(ref(db, `position_transactions/${txId}`), tx);
+    await set(ref(db, `position_transactions/${txId}`), sanitize(tx as Record<string, unknown>));
     await update(ref(db, `positions/${id}`), {
       packedQuantity: newPacked,
       updatedAt: now(),

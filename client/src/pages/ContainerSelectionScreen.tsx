@@ -1,12 +1,14 @@
 import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useOperator } from '../OperatorContext';
+import { useAuth } from '../AuthContext';
+import { useDisplayName } from '../hooks/useDisplayName';
 import { containersApi, exportDataAsync, subscribeToContainers } from '../api';
 import type { Container } from '../types';
 import ConfirmModal from '../components/ConfirmModal';
 
 export default function ContainerSelectionScreen() {
-  const { operatorName } = useOperator();
+  const { user } = useAuth();
+  const displayName = useDisplayName();
   const navigate = useNavigate();
   const [containers, setContainers] = useState<Container[]>([]);
   const [newNumber, setNewNumber] = useState('');
@@ -16,13 +18,32 @@ export default function ContainerSelectionScreen() {
   const [editModal, setEditModal] = useState<Container | null>(null);
   const [editValue, setEditValue] = useState('');
   const [deleteModal, setDeleteModal] = useState<Container | null>(null);
+  const [nameFilter, setNameFilter] = useState('');
+  const [dateFilterFrom, setDateFilterFrom] = useState('');
+  const [dateFilterTo, setDateFilterTo] = useState('');
   const inputRef = useRef<HTMLInputElement>(null);
 
-  useEffect(() => {
-    if (!operatorName) {
-      navigate('/', { replace: true });
+  const filteredContainers = containers.filter((c) => {
+    if (nameFilter.trim()) {
+      const q = nameFilter.trim().toLowerCase();
+      if (!c.containerNumber.toLowerCase().includes(q)) return false;
     }
-  }, [operatorName, navigate]);
+    if (dateFilterFrom) {
+      const from = new Date(dateFilterFrom).getTime();
+      if (new Date(c.createdAt).getTime() < from) return false;
+    }
+    if (dateFilterTo) {
+      const to = new Date(dateFilterTo).getTime();
+      if (new Date(c.createdAt).getTime() > to) return false;
+    }
+    return true;
+  });
+
+  useEffect(() => {
+    if (!user) {
+      navigate('/login', { replace: true });
+    }
+  }, [user, navigate]);
 
   useEffect(() => {
     const unsub = subscribeToContainers(true, (data) => {
@@ -106,7 +127,7 @@ export default function ContainerSelectionScreen() {
     }
   };
 
-  if (!operatorName) return null;
+  if (!user) return null;
 
   return (
     <div style={styles.container}>
@@ -114,17 +135,9 @@ export default function ContainerSelectionScreen() {
         <div style={styles.headerRow}>
           <div>
             <h1 style={styles.title}>Kontit</h1>
-            <p style={styles.operator}>Operaattori: {operatorName}</p>
+            <p style={styles.operator}>Käyttäjä: {displayName || user.name}</p>
           </div>
           <div style={styles.headerButtons}>
-            <button
-              type="button"
-              onClick={() => navigate('/ai-setup')}
-              style={styles.aiSetupBtn}
-              title="Luo kontti skannaamalla purkulista"
-            >
-              AI-setup
-            </button>
             <button
               type="button"
               onClick={() => navigate('/ai-search')}
@@ -132,6 +145,14 @@ export default function ContainerSelectionScreen() {
               title="AI-tuotehaku etiketin kuvalla"
             >
               AI-haku
+            </button>
+            <button
+              type="button"
+              onClick={() => navigate('/settings')}
+              style={styles.exportBtn}
+              title="Asetukset"
+            >
+              Asetukset
             </button>
             <button
             type="button"
@@ -172,13 +193,38 @@ export default function ContainerSelectionScreen() {
 
       <section style={styles.section}>
         <h2 style={styles.sectionTitle}>Avoimet kontit</h2>
+        <div style={styles.filterRow}>
+          <input
+            type="text"
+            value={nameFilter}
+            onChange={(e) => setNameFilter(e.target.value)}
+            placeholder="Suodata nimellä..."
+            style={styles.filterInput}
+          />
+          <input
+            type="date"
+            value={dateFilterFrom}
+            onChange={(e) => setDateFilterFrom(e.target.value)}
+            style={styles.filterDate}
+            title="Luontipäivä alkaen"
+          />
+          <input
+            type="date"
+            value={dateFilterTo}
+            onChange={(e) => setDateFilterTo(e.target.value)}
+            style={styles.filterDate}
+            title="Luontipäivä päättyen"
+          />
+        </div>
         {loading ? (
           <p style={styles.muted}>Ladataan...</p>
         ) : containers.length === 0 ? (
           <p style={styles.muted}>Ei avoimia kontteja. Luo uusi yllä.</p>
+        ) : filteredContainers.length === 0 ? (
+          <p style={styles.muted}>Ei tuloksia suodatuksella.</p>
         ) : (
           <div style={styles.list}>
-            {containers.map((c) => (
+            {filteredContainers.map((c) => (
               <div key={c.id} style={styles.cardWrapper}>
                 <button
                   style={styles.card}
@@ -353,6 +399,32 @@ const styles: Record<string, React.CSSProperties> = {
     fontSize: '1rem',
     fontWeight: 600,
     color: 'var(--color-text-muted)',
+  },
+  filterRow: {
+    display: 'flex',
+    gap: 8,
+    marginBottom: 12,
+    flexWrap: 'wrap',
+  },
+  filterInput: {
+    flex: 1,
+    minWidth: 120,
+    padding: '8px 12px',
+    fontSize: '0.9rem',
+    borderRadius: 'var(--radius-sm)',
+    border: '2px solid var(--color-surface-hover)',
+    background: 'var(--color-surface)',
+    color: 'var(--color-text)',
+    outline: 'none',
+  },
+  filterDate: {
+    padding: '8px 12px',
+    fontSize: '0.9rem',
+    borderRadius: 'var(--radius-sm)',
+    border: '2px solid var(--color-surface-hover)',
+    background: 'var(--color-surface)',
+    color: 'var(--color-text)',
+    outline: 'none',
   },
   list: {
     display: 'flex',
