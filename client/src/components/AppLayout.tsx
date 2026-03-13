@@ -3,7 +3,9 @@ import { Outlet, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../AuthContext';
 import { useDisplayName } from '../hooks/useDisplayName';
 import { exportDataAsync } from '../api';
-import { IconMenu, IconSettings, IconSearch, IconDownload, IconBox, IconClose } from './Icons';
+import { TopBarProvider } from '../contexts/TopBarContext';
+import TopBar from './TopBar';
+import { IconSettings, IconSearch, IconDownload, IconBox, IconClose } from './Icons';
 
 export default function AppLayout() {
   const { user } = useAuth();
@@ -37,84 +39,66 @@ export default function AppLayout() {
   };
 
   return (
-    <div style={styles.wrapper}>
-      <button
-        style={styles.hamburger}
-        onClick={() => setSidebarOpen(true)}
-        aria-label="Avaa valikko"
-      >
-        <IconMenu />
-      </button>
+    <TopBarProvider>
+      <div style={styles.wrapper}>
+        <TopBar onMenuClick={() => setSidebarOpen(true)} />
 
-      {sidebarOpen && (
-        <>
-          <div
-            style={styles.overlay}
-            onClick={closeSidebar}
-            aria-hidden
-          />
-          <aside style={styles.sidebar}>
-            <div style={styles.sidebarHeader}>
-              <span style={styles.sidebarTitle}>Valikko</span>
-              <button style={styles.closeBtn} onClick={closeSidebar} aria-label="Sulje">
-                <IconClose />
-              </button>
-            </div>
-            <p style={styles.userInfo}>
-              {displayName || user?.name}
-            </p>
-            <nav style={styles.nav}>
-              {navItems.map(({ path, label, icon: Icon }) => (
-                <button
-                  key={path}
-                  style={{
-                    ...styles.navItem,
-                    ...(location.pathname.startsWith(path) ? styles.navItemActive : {}),
-                  }}
-                  onClick={() => {
-                    navigate(path);
-                    closeSidebar();
-                  }}
-                >
-                  <Icon />
-                  <span>{label}</span>
+        {sidebarOpen && (
+          <>
+            <div
+              style={styles.overlay}
+              onClick={closeSidebar}
+              aria-hidden
+            />
+            <aside style={styles.sidebar}>
+              <div style={styles.sidebarHeader}>
+                <span style={styles.sidebarTitle}>Valikko</span>
+                <button style={styles.closeBtn} onClick={closeSidebar} aria-label="Sulje">
+                  <IconClose />
                 </button>
-              ))}
-              <button style={styles.navItem} onClick={handleExport}>
-                <IconDownload />
-                <span>Lataa varmuuskopio</span>
-              </button>
-            </nav>
-          </aside>
-        </>
-      )}
+              </div>
+              <p style={styles.userInfo}>
+                {displayName || user?.name}
+              </p>
+              <nav style={styles.nav}>
+                {navItems.map(({ path, label, icon: Icon }) => (
+                  <button
+                    key={path}
+                    style={{
+                      ...styles.navItem,
+                      ...(location.pathname.startsWith(path) ? styles.navItemActive : {}),
+                    }}
+                    onClick={() => {
+                      navigate(path);
+                      closeSidebar();
+                    }}
+                  >
+                    <Icon />
+                    <span>{label}</span>
+                  </button>
+                ))}
+                <button style={styles.navItem} onClick={handleExport}>
+                  <IconDownload />
+                  <span>Lataa varmuuskopio</span>
+                </button>
+              </nav>
+            </aside>
+          </>
+        )}
 
-      <main style={styles.main}>
-        <Outlet />
-      </main>
-    </div>
+        <main style={styles.main}>
+          <Outlet />
+        </main>
+      </div>
+    </TopBarProvider>
   );
 }
 
 const styles: Record<string, React.CSSProperties> = {
   wrapper: {
     minHeight: '100vh',
-    position: 'relative',
-  },
-  hamburger: {
-    position: 'fixed',
-    top: 16,
-    left: 16,
-    zIndex: 100,
-    width: 44,
-    height: 44,
     display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    background: 'var(--color-surface)',
-    color: 'var(--color-text)',
-    borderRadius: 'var(--radius-sm)',
-    boxShadow: 'var(--shadow)',
+    flexDirection: 'column',
   },
   overlay: {
     position: 'fixed',
@@ -181,10 +165,9 @@ const styles: Record<string, React.CSSProperties> = {
     color: 'var(--color-accent)',
   },
   main: {
-    paddingTop: 72,
-    paddingLeft: 16,
-    paddingRight: 16,
+    flex: 1,
+    padding: '12px',
     paddingBottom: 24,
-    minHeight: '100vh',
+    minHeight: 0,
   },
 };

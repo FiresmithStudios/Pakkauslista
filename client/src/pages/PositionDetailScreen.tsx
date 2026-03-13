@@ -7,7 +7,8 @@ import type { Position, PositionTransaction } from '../types';
 import ProgressBar from '../components/ProgressBar';
 import TransactionOverlay from '../components/TransactionOverlay';
 import ConfirmModal from '../components/ConfirmModal';
-import { IconBack, IconEdit, IconTrash } from '../components/Icons';
+import { useTopBar } from '../contexts/TopBarContext';
+import { IconEdit, IconTrash } from '../components/Icons';
 
 export default function PositionDetailScreen() {
   const { containerId, positionId } = useParams<{ containerId: string; positionId: string }>();
@@ -61,6 +62,11 @@ export default function PositionDetailScreen() {
       });
     }
   }, [position, showEditModal]);
+
+  const { setTitle } = useTopBar();
+  useEffect(() => {
+    setTitle(position ? `#${position.positionNumber} ${position.name}` : '...');
+  }, [setTitle, position]);
 
   const handleAdjust = async (direction: number, amount?: number) => {
     if (!positionId || !user || direction === 0) return;
@@ -154,13 +160,6 @@ export default function PositionDetailScreen() {
 
   return (
     <div style={styles.container}>
-      <header style={styles.header}>
-        <button style={styles.backButton} onClick={() => navigate(`/containers/${containerId}`)}>
-          <IconBack />
-          <span>Takaisin</span>
-        </button>
-      </header>
-
       {loading ? (
         <p style={styles.muted}>Ladataan...</p>
       ) : !position ? (
@@ -350,23 +349,9 @@ export default function PositionDetailScreen() {
 
 const styles: Record<string, React.CSSProperties> = {
   container: {
-    minHeight: '100vh',
-    padding: 24,
+    minHeight: '100%',
     paddingBottom: 120,
     position: 'relative',
-  },
-  header: {
-    marginBottom: 24,
-  },
-  backButton: {
-    display: 'flex',
-    alignItems: 'center',
-    gap: 8,
-    background: 'none',
-    color: 'var(--color-accent)',
-    fontWeight: 500,
-    padding: 8,
-    fontSize: '1rem',
   },
   muted: {
     color: 'var(--color-text-muted)',

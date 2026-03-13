@@ -1,7 +1,8 @@
 import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../AuthContext';
-import { IconBack, IconSearch } from '../components/Icons';
+import { useTopBar } from '../contexts/TopBarContext';
+import { IconSearch } from '../components/Icons';
 import { positionsApi } from '../api';
 import { preprocessForOcr } from '../ocr-utils';
 import type { PositionWithContainer } from '../store';
@@ -28,6 +29,11 @@ export default function AiSearchScreen() {
   const [ocrProgress, setOcrProgress] = useState('');
   const [result, setResult] = useState<AiSearchResult | null>(null);
   const [error, setError] = useState<string | null>(null);
+
+  const { setTitle } = useTopBar();
+  useEffect(() => {
+    setTitle('AI-haku');
+  }, [setTitle]);
 
   useEffect(() => {
     if (!user) {
@@ -172,17 +178,12 @@ export default function AiSearchScreen() {
   return (
     <div style={styles.container}>
       <header style={styles.header}>
-        <button style={styles.backButton} onClick={() => navigate('/containers')}>
-          <IconBack />
-          <span>Takaisin</span>
-        </button>
-        <div style={styles.titleRow}>
+        <div style={styles.intro}>
           <IconSearch />
-          <h1 style={styles.title}>AI-tuotehaku</h1>
-        </div>
-        <p style={styles.subtitle}>
+          <p style={styles.subtitle}>
           Ota kuva tuotteen etiketistä – AI tunnistaa oikean position
-        </p>
+          </p>
+        </div>
       </header>
 
       {error && <p style={styles.error}>{error}</p>}
@@ -298,28 +299,10 @@ const styles: Record<string, React.CSSProperties> = {
     paddingBottom: 48,
   },
   header: {
-    marginBottom: 24,
+    marginBottom: 16,
   },
-  backButton: {
-    display: 'flex',
-    alignItems: 'center',
-    gap: 8,
-    background: 'none',
-    color: 'var(--color-accent)',
-    fontWeight: 500,
-    marginBottom: 8,
-    padding: 8,
-    fontSize: '1rem',
-  },
-  titleRow: {
-    display: 'flex',
-    alignItems: 'center',
-    gap: 12,
-  },
-  title: {
-    margin: 0,
-    fontSize: '1.5rem',
-    fontWeight: 700,
+  intro: {
+    marginBottom: 16,
   },
   subtitle: {
     margin: '8px 0 0',

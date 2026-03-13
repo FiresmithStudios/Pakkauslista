@@ -1,10 +1,11 @@
 import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../AuthContext';
+import { useTopBar } from '../contexts/TopBarContext';
 import { getSettings, updateSettings } from '../services/settingsService';
 import { getAllUsedPins, generateRandomUnusedPin, updateUserPin } from '../services/usersService';
 import ConfirmModal from '../components/ConfirmModal';
-import { IconBack, IconSettings, IconKey } from '../components/Icons';
+import { IconKey } from '../components/Icons';
 import type { UserSettings } from '../types';
 
 const HOLD_DURATION_MS = 600;
@@ -24,6 +25,11 @@ export default function SettingsScreen() {
   const [newPinModal, setNewPinModal] = useState(false);
   const [generatedPin, setGeneratedPin] = useState<string | null>(null);
   const holdTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const { setTitle } = useTopBar();
+  useEffect(() => {
+    setTitle('Asetukset');
+  }, [setTitle]);
 
   useEffect(() => {
     if (!user) return;
@@ -104,17 +110,6 @@ export default function SettingsScreen() {
 
   return (
     <div style={styles.container}>
-      <header style={styles.header}>
-        <button style={styles.backButton} onClick={() => navigate(-1)}>
-          <IconBack />
-          <span>Takaisin</span>
-        </button>
-        <div style={styles.titleRow}>
-          <IconSettings />
-          <h1 style={styles.title}>Asetukset</h1>
-        </div>
-      </header>
-
       {loading ? (
         <p style={styles.muted}>Ladataan...</p>
       ) : (
@@ -206,32 +201,7 @@ export default function SettingsScreen() {
 
 const styles: Record<string, React.CSSProperties> = {
   container: {
-    minHeight: '100vh',
-    padding: 24,
-  },
-  header: {
-    marginBottom: 24,
-  },
-  backButton: {
-    display: 'flex',
-    alignItems: 'center',
-    gap: 8,
-    background: 'none',
-    color: 'var(--color-accent)',
-    fontWeight: 500,
-    marginBottom: 8,
-    padding: 8,
-    fontSize: '1rem',
-  },
-  titleRow: {
-    display: 'flex',
-    alignItems: 'center',
-    gap: 12,
-  },
-  title: {
-    margin: 0,
-    fontSize: '1.5rem',
-    fontWeight: 700,
+    minHeight: '100%',
   },
   form: {
     display: 'flex',

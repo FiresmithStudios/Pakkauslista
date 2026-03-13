@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../AuthContext';
 import { useDisplayName } from '../hooks/useDisplayName';
+import { useTopBar } from '../contexts/TopBarContext';
 import { containersApi, subscribeToContainers } from '../api';
 import type { Container } from '../types';
 import ConfirmModal from '../components/ConfirmModal';
@@ -10,7 +11,12 @@ import { IconFilter, IconBox, IconEdit, IconTrash, IconMore } from '../component
 export default function ContainerSelectionScreen() {
   const { user } = useAuth();
   const displayName = useDisplayName();
+  const { setTitle } = useTopBar();
   const navigate = useNavigate();
+
+  useEffect(() => {
+    setTitle(displayName || user?.name || 'Kontit');
+  }, [setTitle, displayName, user?.name]);
   const [containers, setContainers] = useState<Container[]>([]);
   const [newNumber, setNewNumber] = useState('');
   const [loading, setLoading] = useState(true);
@@ -135,18 +141,6 @@ export default function ContainerSelectionScreen() {
 
   return (
     <div style={styles.container}>
-      <header style={styles.header}>
-        <div style={styles.headerRow}>
-          <div style={styles.titleRow}>
-            <IconBox />
-            <div>
-              <h1 style={styles.title}>Kontit</h1>
-              <p style={styles.operator}>{displayName || user.name}</p>
-            </div>
-          </div>
-        </div>
-      </header>
-
       <form onSubmit={handleCreateOrSelect} style={styles.form}>
         <input
           ref={inputRef}
@@ -291,32 +285,7 @@ export default function ContainerSelectionScreen() {
 
 const styles: Record<string, React.CSSProperties> = {
   container: {
-    minHeight: '100vh',
-    padding: 24,
-    paddingBottom: 48,
-  },
-  header: {
-    marginBottom: 24,
-  },
-  headerRow: {
-    display: 'flex',
-    alignItems: 'flex-start',
-    gap: 16,
-  },
-  titleRow: {
-    display: 'flex',
-    alignItems: 'center',
-    gap: 12,
-  },
-  title: {
-    margin: 0,
-    fontSize: '1.5rem',
-    fontWeight: 700,
-  },
-  operator: {
-    margin: '4px 0 0',
-    color: 'var(--color-text-muted)',
-    fontSize: '0.9rem',
+    minHeight: '100%',
   },
   form: {
     display: 'flex',

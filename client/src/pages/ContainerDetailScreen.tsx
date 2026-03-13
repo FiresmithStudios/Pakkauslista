@@ -9,7 +9,8 @@ import EmptyState from '../components/EmptyState';
 import ConfirmModal from '../components/ConfirmModal';
 import AddPositionWithAiModal from '../components/AddPositionWithAiModal';
 import { logEvent } from '../services/eventsService';
-import { IconBack, IconBox, IconPlus, IconSparkles, IconEdit, IconTrash, IconMore } from '../components/Icons';
+import { useTopBar } from '../contexts/TopBarContext';
+import { IconPlus, IconSparkles, IconEdit, IconTrash, IconMore } from '../components/Icons';
 
 export default function ContainerDetailScreen() {
   const { containerId } = useParams<{ containerId: string }>();
@@ -59,6 +60,11 @@ export default function ContainerDetailScreen() {
   useEffect(() => {
     if (editContainerModal && container) setEditContainerValue(container.containerNumber);
   }, [editContainerModal, container]);
+
+  const { setTitle } = useTopBar();
+  useEffect(() => {
+    setTitle(container?.containerNumber ?? '...');
+  }, [setTitle, container?.containerNumber]);
 
   const handleEditContainer = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -160,42 +166,32 @@ export default function ContainerDetailScreen() {
 
   return (
     <div style={styles.container}>
-      <header style={styles.header}>
-        <button style={styles.backButton} onClick={() => navigate('/containers')}>
-          <IconBack />
-          <span>Takaisin</span>
-        </button>
-        <div style={styles.titleRow}>
-          <IconBox />
-          <h1 style={styles.title}>{container?.containerNumber ?? '...'}</h1>
-          {container && !container.isClosed && (
-            <div style={styles.headerMenuWrap}>
-              <button
-                style={styles.menuBtn}
-                onClick={() => setContainerMenuOpen(!containerMenuOpen)}
-                aria-label="Valikko"
-              >
-                <IconMore />
+      {container && !container.isClosed && (
+        <div style={styles.containerMenuWrap} aria-hidden>
+          <button
+            style={styles.menuBtn}
+            onClick={() => setContainerMenuOpen(!containerMenuOpen)}
+            aria-label="Kontin valikko"
+          >
+            <IconMore />
+          </button>
+          {containerMenuOpen && (
+            <div style={styles.headerMenu}>
+              <button style={styles.menuItem} onClick={() => { setEditContainerModal(true); setContainerMenuOpen(false); }}>
+                <IconEdit />
+                <span>Muokkaa konttia</span>
               </button>
-              {containerMenuOpen && (
-                <div style={styles.headerMenu}>
-                  <button style={styles.menuItem} onClick={() => { setEditContainerModal(true); setContainerMenuOpen(false); }}>
-                    <IconEdit />
-                    <span>Muokkaa konttia</span>
-                  </button>
-                  <button style={styles.menuItem} onClick={handleCloseContainer}>
-                    Sulje kontti
-                  </button>
-                  <button style={styles.menuItemDanger} onClick={() => { setDeleteContainerModal(true); setContainerMenuOpen(false); }}>
-                    <IconTrash />
-                    <span>Poista kontti</span>
-                  </button>
-                </div>
-              )}
+              <button style={styles.menuItem} onClick={handleCloseContainer}>
+                Sulje kontti
+              </button>
+              <button style={styles.menuItemDanger} onClick={() => { setDeleteContainerModal(true); setContainerMenuOpen(false); }}>
+                <IconTrash />
+                <span>Poista kontti</span>
+              </button>
             </div>
           )}
         </div>
-      </header>
+      )}
 
       {error && <p style={styles.error}>{error}</p>}
 
@@ -379,21 +375,15 @@ export default function ContainerDetailScreen() {
 
 const styles: Record<string, React.CSSProperties> = {
   container: {
-    minHeight: '100vh',
-    padding: 24,
+    minHeight: '100%',
     paddingBottom: 100,
-  },
-  header: {
-    marginBottom: 24,
-  },
-  titleRow: {
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    gap: 12,
-  },
-  headerMenuWrap: {
     position: 'relative',
+  },
+  containerMenuWrap: {
+    position: 'absolute',
+    top: 0,
+    right: 0,
+    zIndex: 10,
   },
   menuBtn: {
     padding: '8px 12px',
@@ -407,6 +397,7 @@ const styles: Record<string, React.CSSProperties> = {
     top: '100%',
     right: 0,
     marginTop: 4,
+    minWidth: 180,
     background: 'var(--color-surface)',
     borderRadius: 'var(--radius-sm)',
     boxShadow: 'var(--shadow)',
@@ -434,22 +425,6 @@ const styles: Record<string, React.CSSProperties> = {
     background: 'none',
     color: '#f87171',
     fontSize: '1rem',
-  },
-  backButton: {
-    display: 'flex',
-    alignItems: 'center',
-    gap: 8,
-    background: 'none',
-    color: 'var(--color-accent)',
-    fontWeight: 500,
-    marginBottom: 8,
-    padding: 8,
-    fontSize: '1rem',
-  },
-  title: {
-    margin: 0,
-    fontSize: '1.5rem',
-    fontWeight: 700,
   },
   error: {
     color: '#f87171',
